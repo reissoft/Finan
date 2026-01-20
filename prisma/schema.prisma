@@ -3,48 +3,183 @@
 
 generator client {
     provider = "prisma-client-js"
-    output   = "../generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+    provider = "postgresql" // Mantenha postgresql
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
+// --------------------------------------------------------
+// MODELOS DE AUTENTICAÇÃO E TENANT (IGREJA)
+// --------------------------------------------------------
+
+// A "Igreja" ou Cliente do seu SaaS
+model Tenant {
+    id        String   @id @default(cuid())
     name      String
+    slug      String   @unique // Para usar na url tipo: app.seusistema.com/igreja-batista
+    plan      Plan     @default(FREE)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
+    // Relacionamentos (Uma igreja tem vários...)
+    users        User[]
+    members      Member[]
+    categories   Category[]
+    transactions transaction[]
+    accounts     Account[] // Contas bancárias (Caixinha, Santander, etc)
 
-    @@index([name])
+    @@map("tenants")
 }
 
-// Necessary for Next auth
+enum Plan {
+    FREE
+    PRO
+    ENTERPRISE
+}
+
+// O Usuário do Sistema (Pastor, Tesoureiro)
+model User {
+    id            String    @id @default(cuid())
+    name          String?
+    email         String    @unique
+    emailVerified DateTime?
+    image         String?
+    role          Role      @default(USER)
+    
+    // Link com a Igreja (Tenant)
+    tenantId      String?   
+    tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+
+    // Tabelas padrão do NextAuth (para login com Google/Github se precisar)
+    accounts      NextAuthAccount[]
+    sessions      Session[]
+
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@index([tenantId])
+    @@map("users")
+}
+
+enum Role {
+    USER      // Apenas visualiza
+    TREASURER // Pode lançar
+    ADMIN     // Pode tudo
+}
+
+// --------------------------------------------------------
+// MODELOS FINANCEIROS (O CORAÇÃO DO SISTEMA)
+// --------------------------------------------------------
+
+// Membros (Dizimistas)
+model Member {
+    id        String   @id @default(cuid())
+    name      String
+    phone     String?
+    email     String?
+    birthDate DateTime?
+    
+    tenantId  String
+    tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+    transactions transaction[] // Histórico de dízimos deste membro
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([tenantId]) // Vital para performance (buscar membros só dessa igreja)
+    @@map("members")
+}
+
+// Plano de Contas (Categorias: Dízimo, Oferta, Luz, Aluguel)
+model Category {
+    id        String   @id @default(cuid())
+    name      String
+    type      TransactionType // ENTRADA ou SAIDA
+    
+    tenantId  String
+    tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+    transactions transaction[]
+
+    @@index([tenantId])
+    @@map("categories")
+}
+
+// Contas Bancárias / Caixas
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String
-    type                     String
-    provider                 String
-    providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? // @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+    id        String   @id @default(cuid())
+    name      String   // Ex: "Cofre", "Banco do Brasil"
+    initialBalance Decimal @default(0) // Saldo inicial ao começar usar o sistema
+    
+    tenantId  String
+    tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+    transactions transaction[]
+
+    @@index([tenantId])
+    @@map("accounts")
+}
+
+// Lançamentos (Entradas e Saídas)
+model transaction {
+    id          String   @id @default(cuid())
+    description String?  // Descrição opcional (ex: "Compra de Pães")
+    amount      Decimal  @db.Decimal(10, 2) // Dinheiro SEMPRE Decimal. (10 digitos, 2 casas decimais)
+    date        DateTime @default(now()) // Data do fato gerador
+    type        TransactionType
+    
+    // Relacionamentos
+    tenantId    String
+    tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+    categoryId  String
+    category    Category @relation(fields: [categoryId], references: [id])
+
+    accountId   String
+    account     Account  @relation(fields: [accountId], references: [id])
+
+    memberId    String?  // Opcional: Só preenche se for dízimo identificado
+    member      Member?  @relation(fields: [memberId], references: [id])
+
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@index([tenantId])
+    @@index([date])
+    @@map("transactions")
+}
+
+enum TransactionType {
+    INCOME  // Entrada
+    EXPENSE // Saída
+}
+
+// --------------------------------------------------------
+// TABELAS PADRÃO DO NEXT-AUTH (Autenticação)
+// --------------------------------------------------------
+// Não mude isso se for usar NextAuth, são obrigatórias.
+
+model NextAuthAccount {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([provider, providerAccountId])
+    @@map("next_auth_accounts")
 }
 
 model Session {
@@ -53,17 +188,8 @@ model Session {
     userId       String
     expires      DateTime
     user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
+    
+    @@map("sessions")
 }
 
 model VerificationToken {
@@ -72,4 +198,5 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+    @@map("verification_tokens")
 }

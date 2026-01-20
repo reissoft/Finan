@@ -1,50 +1,98 @@
+import { auth } from "~/server/auth"; // <--- Importação nova (v5)
 import { api } from "~/trpc/server";
-// 1. Importe o componente novo (agora ele existe!)
 import { CreateTransaction } from "./_components/create-transaction";
+import { TransactionItem } from "./_components/transaction-item";
+import { AuthForm } from "./_components/auth-form"; // <--- O formulário novo
+import Link from "next/link";
 
 export default async function Home() {
-  // O "noStore" ou force-dynamic às vezes é necessário no Next 15 para não cachear dízimos
-  // mas vamos testar sem primeiro.
+  // 1. Verifica a sessão usando a nova função do NextAuth v5
+  const session = await auth();
+
+  // 2. BLOQUEIO: Se não estiver logado, mostra o Login/Cadastro
+  if (!session) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
+         <div className="mb-8 text-center">
+            <h1 className="text-5xl font-bold text-white mb-2">Finan Igreja ⛪</h1>
+            <p className="text-gray-400">Sistema de Tesouraria Inteligente</p>
+         </div>
+         {/* Mostra o formulário de Login */}
+         <AuthForm />
+      </main>
+    );
+  }
+
+  // 3. Se passou daqui, o usuário está logado! Carrega o Dashboard.
   const transactions = await api.transaction.getAll();
+  const stats = await api.transaction.getDashboardStats();
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8 bg-gray-100">
-      <h1 className="text-4xl font-bold mb-8 text-blue-900">
-        Financeiro Igreja
-      </h1>
+      <div className="w-full max-w-4xl flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
+        <Link 
+     href="/members" 
+     className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition"
+   >
+     👥 Gerenciar Membros
+   </Link>
+        <div className="flex items-center gap-4">
+            <div className="text-right">
+                <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
+                <p className="text-xs text-gray-500">{session.user?.email}</p>
+            </div>
+            <Link 
+                href="/api/auth/signout" 
+                className="bg-red-100 text-red-600 px-4 py-2 rounded text-sm font-bold hover:bg-red-200"
+            >
+                Sair
+            </Link>
+        </div>
+      </div>
 
-      <div className="w-full max-w-4xl">
-        {/* 2. Adicione o formulário aqui em cima */}
+      <div className="w-full max-w-4xl space-y-6">
+        {/* CARDS */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+            <p className="text-gray-500 text-sm">Entradas</p>
+            <p className="text-2xl font-bold text-green-600">R$ {stats.income.toFixed(2)}</p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
+            <p className="text-gray-500 text-sm">Saídas</p>
+            <p className="text-2xl font-bold text-red-600">R$ {stats.expense.toFixed(2)}</p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+            <p className="text-gray-500 text-sm">Saldo Atual</p>
+            <p className={`text-2xl font-bold ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
+              R$ {stats.balance.toFixed(2)}
+            </p>
+          </div>
+        </div>
+
+        {/* Formulário de Transação */}
         <CreateTransaction />
 
+        {/* Lista */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2">
-            Últimos Lançamentos
-          </h2>
-
+          <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Histórico</h2>
           <div className="space-y-4">
             {transactions.length === 0 ? (
-              <p className="text-gray-500">Nenhum lançamento encontrado.</p>
+              <p className="text-gray-500 text-center py-8">Nenhum lançamento encontrado.</p>
             ) : (
               transactions.map((t) => (
-                <div
+                <TransactionItem
                   key={t.id}
-                  className="flex justify-between items-center p-4 border rounded hover:bg-gray-50"
-                >
-                  <div>
-                    <p className="font-bold text-lg">{t.description}</p>
-                    <p className="text-sm text-gray-500">
-                      {t.category.name} • {t.account.name} • {t.date.toLocaleDateString()}
-                    </p>
-                  </div>
-                  
-                  <div className={`text-xl font-bold ${
-                      t.type === "INCOME" ? "text-green-600" : "text-red-600"
-                  }`}>
-                    {t.type === "INCOME" ? "+" : "-"} 
-                    R$ {Number(t.amount).toFixed(2)}
-                  </div>
-                </div>
+                  transaction={{
+                    id: t.id,
+                    description: t.description,
+                    type: t.type,
+                    date: t.date,
+                    amount: Number(t.amount),
+                    category: { name: t.category.name },
+                    account: { name: t.account.name },
+                  }}
+                />
               ))
             )}
           </div>

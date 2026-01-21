@@ -3,20 +3,37 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 
 export const transactionRouter = createTRPCRouter({
-  // 1. LISTAR
-  getAll: protectedProcedure.query(async ({ ctx }) => {
-    // Busca o tenantId do usuário logado
-    const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
-    if (!user?.tenantId) throw new TRPCError({ code: "BAD_REQUEST", message: "Usuário sem organização" });
+    getAll: protectedProcedure
+    .input(
+        // ACEITA MÊS E ANO OPCIONAIS
+        z.object({
+            month: z.number().optional(),
+            year: z.number().optional()
+        }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user?.tenantId) throw new TRPCError({ code: "BAD_REQUEST" });
 
-    return ctx.db.transaction.findMany({
-      where: { tenantId: user.tenantId }, // <--- FILTRO MÁGICO
-      orderBy: { date: "desc" },
-      include: { category: true, account: true,member: true },
+      // LÓGICA DE DATA (SE VIER INPUT, FILTRA. SE NÃO, PEGA TUDO OU O MÊS ATUAL?)
+      // Vamos assumir: Se vier input, filtra. Se não vier, traz tudo (ou mês atual, você decide).
+      // Aqui vou fazer: Se tiver input, filtra.
       
-    });
-  }),
+      const dateFilter = input?.month && input?.year ? {
+        gte: new Date(input.year, input.month - 1, 1), // Dia 1 do mês (Lembre que JS conta Jan como 0)
+        lt: new Date(input.year, input.month, 1),      // Dia 1 do PRÓXIMO mês
+      } : undefined;
 
+      return ctx.db.transaction.findMany({
+        where: { 
+            tenantId: user.tenantId,
+            date: dateFilter // <--- APLICA O FILTRO
+        },
+        include: { category: true, account: true, member: true },
+        orderBy: { date: "desc" },
+      });
+    }),
+  
   // 2. CRIAR
   create: protectedProcedure
     .input(
@@ -86,27 +103,48 @@ export const transactionRouter = createTRPCRouter({
   }),
 
   // 6. DASHBOARD
-  getDashboardStats: protectedProcedure.query(async ({ ctx }) => {
-    const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
-    if (!user?.tenantId) return { income: 0, expense: 0, balance: 0 };
+  getDashboardStats: protectedProcedure
+    .input(
+        z.object({
+            month: z.number().optional(),
+            year: z.number().optional()
+        }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user?.tenantId) return { income: 0, expense: 0, balance: 0 };
 
-    const income = await ctx.db.transaction.aggregate({
-      where: { type: "INCOME", tenantId: user.tenantId },
-      _sum: { amount: true },
-    });
+      // MESMA LÓGICA DE DATA
+      const dateFilter = input?.month && input?.year ? {
+        gte: new Date(input.year, input.month - 1, 1),
+        lt: new Date(input.year, input.month, 1),
+      } : undefined;
 
-    const expense = await ctx.db.transaction.aggregate({
-      where: { type: "EXPENSE", tenantId: user.tenantId },
-      _sum: { amount: true },
-    });
+      const income = await ctx.db.transaction.aggregate({
+        where: { 
+            type: "INCOME", 
+            tenantId: user.tenantId,
+            date: dateFilter // <--- APLICA
+        },
+        _sum: { amount: true },
+      });
 
-    const totalIncome = Number(income._sum.amount || 0);
-    const totalExpense = Number(expense._sum.amount || 0);
+      const expense = await ctx.db.transaction.aggregate({
+        where: { 
+            type: "EXPENSE", 
+            tenantId: user.tenantId,
+            date: dateFilter // <--- APLICA
+        },
+        _sum: { amount: true },
+      });
 
-    return {
-      income: totalIncome,
-      expense: totalExpense,
-      balance: totalIncome - totalExpense,
-    };
-  }),
+      const totalIncome = Number(income._sum.amount || 0);
+      const totalExpense = Number(expense._sum.amount || 0);
+
+      return {
+        income: totalIncome,
+        expense: totalExpense,
+        balance: totalIncome - totalExpense,
+      };
+    }),
 });

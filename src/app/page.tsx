@@ -1,15 +1,19 @@
-import { auth } from "~/server/auth"; // <--- Importação nova (v5)
+import { auth } from "~/server/auth";
 import { api } from "~/trpc/server";
 import { CreateTransaction } from "./_components/create-transaction";
 import { TransactionItem } from "./_components/transaction-item";
-import { AuthForm } from "./_components/auth-form"; // <--- O formulário novo
+import { AuthForm } from "./_components/auth-form";
+import { MonthSelector } from "./_components/month-selector"; // <--- NOVO IMPORT
 import Link from "next/link";
 
-export default async function Home() {
-  // 1. Verifica a sessão usando a nova função do NextAuth v5
+// A página agora recebe "searchParams" (parâmetros da URL)
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   const session = await auth();
 
-  // 2. BLOQUEIO: Se não estiver logado, mostra o Login/Cadastro
   if (!session) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
@@ -17,30 +21,36 @@ export default async function Home() {
             <h1 className="text-5xl font-bold text-white mb-2">Finan Igreja ⛪</h1>
             <p className="text-gray-400">Sistema de Tesouraria Inteligente</p>
          </div>
-         {/* Mostra o formulário de Login */}
          <AuthForm />
       </main>
     );
   }
 
-  // 3. Se passou daqui, o usuário está logado! Carrega o Dashboard.
-  const transactions = await api.transaction.getAll();
-  const stats = await api.transaction.getDashboardStats();
+  // 1. DESCOBRIR A DATA ATUAL (URL ou Hoje)
+  const month = Number(searchParams?.month) || new Date().getMonth() + 1;
+  const year = Number(searchParams?.year) || new Date().getFullYear();
+
+  // 2. PASSAR A DATA PARA O BACKEND
+  const transactions = await api.transaction.getAll({ month, year });
+  const stats = await api.transaction.getDashboardStats({ month, year });
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8 bg-gray-100">
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
-        <Link 
-     href="/members" 
-     className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition"
-   >
-     👥 Gerenciar Membros
-   </Link>
+        
+        {/* SELETOR DE DATA AQUI NO TOPO */}
+        <MonthSelector /> 
+
         <div className="flex items-center gap-4">
-            <div className="text-right">
+             <Link 
+                href="/members" 
+                className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm"
+              >
+                👥 Membros
+              </Link>
+            <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
-                <p className="text-xs text-gray-500">{session.user?.email}</p>
             </div>
             <Link 
                 href="/api/auth/signout" 
@@ -55,30 +65,33 @@ export default async function Home() {
         {/* CARDS */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-            <p className="text-gray-500 text-sm">Entradas</p>
+            <p className="text-gray-500 text-sm">Entradas ({month}/{year})</p>
             <p className="text-2xl font-bold text-green-600">R$ {stats.income.toFixed(2)}</p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
-            <p className="text-gray-500 text-sm">Saídas</p>
+            <p className="text-gray-500 text-sm">Saídas ({month}/{year})</p>
             <p className="text-2xl font-bold text-red-600">R$ {stats.expense.toFixed(2)}</p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
-            <p className="text-gray-500 text-sm">Saldo Atual</p>
+            <p className="text-gray-500 text-sm">Saldo ({month}/{year})</p>
             <p className={`text-2xl font-bold ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
               R$ {stats.balance.toFixed(2)}
             </p>
           </div>
         </div>
 
-        {/* Formulário de Transação */}
         <CreateTransaction />
 
-        {/* Lista */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Histórico</h2>
+          <h2 className="text-2xl font-semibold mb-4 border-b pb-2 flex justify-between">
+            <span>Lançamentos</span>
+            <span className="text-sm text-gray-400 font-normal">Mostrando {transactions.length} itens</span>
+          </h2>
           <div className="space-y-4">
             {transactions.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">Nenhum lançamento encontrado.</p>
+              <p className="text-gray-500 text-center py-8">
+                Nenhum lançamento em {month}/{year}.
+              </p>
             ) : (
               transactions.map((t) => (
                 <TransactionItem

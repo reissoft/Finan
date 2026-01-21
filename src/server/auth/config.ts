@@ -1,22 +1,26 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { type DefaultSession, type NextAuthConfig } from "next-auth"; // <--- Mudou aqui
+import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { db } from "~/server/db";
 
 /**
- * Tipagem extra para incluir o ID do usuário na sessão
+ * Module augmentation for `next-auth` types.
+ * Allows us to add custom properties to the `session` object and keep type
+ * safety.
  */
 declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
+      // ...other properties
+      // role: UserRole;
     } & DefaultSession["user"];
   }
 }
 
 /**
- * Opções de Configuração (Versão 5)
+ * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
  */
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -27,10 +31,12 @@ export const authConfig: NextAuthConfig = {
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-       // if (!credentials?.email || !credentials?.password) return null;
-      if (!credentials?.email || !credentials?.password) {
+        // --- A CORREÇÃO ESTÁ AQUI NA LINHA ABAIXO ---
+        // Usamos ?. para verificar se credentials existe E se tem email
+        if (!credentials?.email || !credentials?.password) {
           return null;
         }
+
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },
         });

@@ -13,6 +13,7 @@ type TransactionProps = {
     date: Date;
     category: { name: string };
     account: { name: string };
+    member?: { name: string } | null;
   };
 };
 
@@ -34,7 +35,13 @@ export function TransactionItem({ transaction: t }: TransactionProps) {
   return (
     <div className="flex justify-between items-center p-4 border rounded hover:bg-gray-50 bg-white shadow-sm transition-all">
       <div className="flex flex-col">
-        <span className="font-bold text-lg text-gray-800">{t.description}</span>
+        <span className="font-bold text-lg text-gray-800">{t.description}
+            {t.member && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    👤 {t.member.name}
+                </span>
+            )}
+        </span>
         <span className="text-sm text-gray-500">
           {t.category.name} • {t.account.name} • {t.date.toLocaleDateString()}
         </span>

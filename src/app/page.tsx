@@ -91,6 +91,7 @@ export default async function Home() {
                     amount: Number(t.amount),
                     category: { name: t.category.name },
                     account: { name: t.account.name },
+                    member: t.member ? { name: t.member.name } : null,
                   }}
                 />
               ))

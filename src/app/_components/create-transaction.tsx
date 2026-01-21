@@ -12,12 +12,14 @@ export function CreateTransaction() {
   const [type, setType] = useState<"INCOME" | "EXPENSE">("INCOME");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [memberId, setMemberId] = useState("");
   
   // 1. NOVO: Estado para a data (inicia com a data de hoje formatada YYYY-MM-DD)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   const { data: categories } = api.transaction.getCategories.useQuery();
   const { data: accounts } = api.transaction.getAccounts.useQuery();
+  const { data: members } = api.member.getAll.useQuery();
 
   const createMutation = api.transaction.create.useMutation({
     onSuccess: () => {
@@ -26,6 +28,7 @@ export function CreateTransaction() {
       setAmount("");
       // Reseta para hoje
       setDate(new Date().toISOString().split('T')[0]);
+      setMemberId("");
     },
   });
 
@@ -42,6 +45,7 @@ export function CreateTransaction() {
       date: new Date(date + "T12:00:00"), 
       categoryId,
       accountId,
+      memberId: memberId || undefined,
     });
   };
 
@@ -110,7 +114,18 @@ export function CreateTransaction() {
                 <option key={acc.id} value={acc.id}>{acc.name}</option>
             ))}
         </select>
-
+{type === "INCOME" && (
+            <select
+                className="border p-2 rounded flex-1 text-black"
+                value={memberId}
+                onChange={(e) => setMemberId(e.target.value)}
+            >
+                <option value="">Anônimo / Visitante</option>
+                {members?.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+            </select>
+        )}
         <button
             type="submit"
             disabled={createMutation.isPending}

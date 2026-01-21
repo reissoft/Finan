@@ -12,7 +12,8 @@ export const transactionRouter = createTRPCRouter({
     return ctx.db.transaction.findMany({
       where: { tenantId: user.tenantId }, // <--- FILTRO MÁGICO
       orderBy: { date: "desc" },
-      include: { category: true, account: true },
+      include: { category: true, account: true,member: true },
+      
     });
   }),
 
@@ -26,6 +27,7 @@ export const transactionRouter = createTRPCRouter({
         categoryId: z.string(),
         accountId: z.string(),
         date: z.date(),
+        memberId: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -40,7 +42,10 @@ export const transactionRouter = createTRPCRouter({
           date: input.date,
           category: { connect: { id: input.categoryId } },
           account: { connect: { id: input.accountId } },
-          tenant: { connect: { id: user.tenantId } } // <--- Conecta na igreja do usuário
+          tenant: { connect: { id: user.tenantId } },
+          ...(input.memberId && {
+            member: { connect: { id: input.memberId } }
+        }),
         },
       });
     }),

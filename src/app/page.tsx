@@ -3,15 +3,15 @@ import { api } from "~/trpc/server";
 import { CreateTransaction } from "./_components/create-transaction";
 import { TransactionItem } from "./_components/transaction-item";
 import { AuthForm } from "./_components/auth-form";
-import { MonthSelector } from "./_components/month-selector"; // <--- NOVO IMPORT
+import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 
-// A página agora recebe "searchParams" (parâmetros da URL)
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
-}) {
+// 1. MUDANÇA NO TIPO (Adicionamos Promise<...>)
+type Props = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function Home({ searchParams }: Props) {
   const session = await auth();
 
   if (!session) {
@@ -26,11 +26,14 @@ export default async function Home({
     );
   }
 
-  // 1. DESCOBRIR A DATA ATUAL (URL ou Hoje)
-  const month = Number(searchParams?.month) || new Date().getMonth() + 1;
-  const year = Number(searchParams?.year) || new Date().getFullYear();
+  // 2. MUDANÇA NA LEITURA (Precisamos do await)
+  const params = await searchParams;
+  
+  // Agora usamos a variável "params" que já foi carregada
+  const month = Number(params?.month) || new Date().getMonth() + 1;
+  const year = Number(params?.year) || new Date().getFullYear();
 
-  // 2. PASSAR A DATA PARA O BACKEND
+  // O resto continua igual...
   const transactions = await api.transaction.getAll({ month, year });
   const stats = await api.transaction.getDashboardStats({ month, year });
 
@@ -39,7 +42,6 @@ export default async function Home({
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
         
-        {/* SELETOR DE DATA AQUI NO TOPO */}
         <MonthSelector /> 
 
         <div className="flex items-center gap-4">
@@ -62,7 +64,6 @@ export default async function Home({
       </div>
 
       <div className="w-full max-w-4xl space-y-6">
-        {/* CARDS */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
             <p className="text-gray-500 text-sm">Entradas ({month}/{year})</p>

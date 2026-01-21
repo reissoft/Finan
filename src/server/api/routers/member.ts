@@ -32,8 +32,8 @@ export const memberRouter = createTRPCRouter({
         data: {
           name: input.name,
           phone: input.phone,
-          email: input.email || null,
-          birthDate: input.birthDate || null, // Salva a data se tiver
+          email: input.email ?? null,
+          birthDate: input.birthDate ?? null, // Salva a data se tiver
           tenant: { connect: { id: user.tenantId } },
         },
       });

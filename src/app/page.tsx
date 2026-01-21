@@ -28,10 +28,21 @@ export default async function Home({ searchParams }: Props) {
 
   // 2. MUDANÇA NA LEITURA (Precisamos do await)
   const params = await searchParams;
+  const now = new Date();
   
+  // 1. Tenta converter o mês para número
+  const rawMonth = Number(params?.month);
+  // 2. Se for NaN (inválido) ou 0, usa o mês atual
+  const month = !rawMonth || isNaN(rawMonth) ? now.getMonth() + 1 : rawMonth;
+
+  // 1. Tenta converter o ano
+  const rawYear = Number(params?.year);
+  // 2. Se for NaN (inválido) ou 0, usa o ano atual
+  const year = !rawYear || isNaN(rawYear) ? now.getFullYear() : rawYear;
+  // ---------------------
   // Agora usamos a variável "params" que já foi carregada
-  const month = Number(params?.month) || new Date().getMonth() + 1;
-  const year = Number(params?.year) || new Date().getFullYear();
+  //const month = Number(params?.month) && new Date().getMonth() + 1;
+  //const year = Number(params?.year) && new Date().getFullYear();
 
   // O resto continua igual...
   const transactions = await api.transaction.getAll({ month, year });

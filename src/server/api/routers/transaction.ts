@@ -138,8 +138,8 @@ export const transactionRouter = createTRPCRouter({
         _sum: { amount: true },
       });
 
-      const totalIncome = Number(income._sum.amount || 0);
-      const totalExpense = Number(expense._sum.amount || 0);
+      const totalIncome = Number(income._sum.amount ?? 0);
+      const totalExpense = Number(expense._sum.amount ?? 0);
 
       return {
         income: totalIncome,

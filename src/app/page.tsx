@@ -17,11 +17,11 @@ export default async function Home({ searchParams }: Props) {
   if (!session) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
-         <div className="mb-8 text-center">
-            <h1 className="text-5xl font-bold text-white mb-2">Finan Igreja ⛪</h1>
-            <p className="text-gray-400">Sistema de Tesouraria Inteligente</p>
-         </div>
-         <AuthForm />
+        <div className="mb-8 text-center">
+          <h1 className="text-5xl font-bold text-white mb-2">Finan Igreja ⛪</h1>
+          <p className="text-gray-400">Sistema de Tesouraria Inteligente</p>
+        </div>
+        <AuthForm />
       </main>
     );
   }
@@ -29,7 +29,7 @@ export default async function Home({ searchParams }: Props) {
   // 2. MUDANÇA NA LEITURA (Precisamos do await)
   const params = await searchParams;
   const now = new Date();
-  
+
   // 1. Tenta converter o mês para número
   const rawMonth = Number(params?.month);
   // 2. Se for NaN (inválido) ou 0, usa o mês atual
@@ -52,25 +52,28 @@ export default async function Home({ searchParams }: Props) {
     <main className="flex min-h-screen flex-col items-center p-8 bg-gray-100">
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
-        
-        <MonthSelector /> 
+
+        <MonthSelector />
 
         <div className="flex items-center gap-4">
-             <Link 
-                href="/members" 
-                className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm"
-              >
-                👥 Membros
-              </Link>
-            <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
-            </div>
-            <Link 
-                href="/api/auth/signout" 
-                className="bg-red-100 text-red-600 px-4 py-2 rounded text-sm font-bold hover:bg-red-200"
-            >
-                Sair
-            </Link>
+          <Link
+            href="/members"
+            className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm"
+          >
+            👥 Membros
+          </Link>
+          <Link href="/settings" className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm">
+            ⚙️ Configurações
+          </Link>
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
+          </div>
+          <Link
+            href="/api/auth/signout"
+            className="bg-red-100 text-red-600 px-4 py-2 rounded text-sm font-bold hover:bg-red-200"
+          >
+            Sair
+          </Link>
         </div>
       </div>
 

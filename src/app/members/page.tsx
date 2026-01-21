@@ -14,7 +14,7 @@ export default function MembersPage() {
   const createMutation = api.member.create.useMutation({
     onSuccess: () => {
       alert("Membro cadastrado!");
-      refetch(); // Atualiza a lista
+      void refetch();
       setName("");
       setPhone("");
       setBirthDate("");
@@ -23,15 +23,15 @@ export default function MembersPage() {
   });
 
   const deleteMutation = api.member.delete.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => void refetch(),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // CORREÇÃO 1: Adicionamos 'void' antes do mutate
     createMutation.mutate({ 
         name, 
         phone, 
-        // Se a data estiver vazia, manda undefined, senão manda a data
         birthDate: birthDate ? new Date(birthDate) : undefined 
     });
   };
@@ -40,7 +40,6 @@ export default function MembersPage() {
     <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-4xl">
         
-        {/* Cabeçalho */}
         <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-blue-900">Gerenciar Membros 👥</h1>
             <Link href="/" className="text-gray-600 hover:text-blue-600 font-bold">
@@ -48,7 +47,6 @@ export default function MembersPage() {
             </Link>
         </div>
 
-        {/* Formulário */}
         <div className="bg-white p-6 rounded-lg shadow-md mb-8">
             <h2 className="text-xl font-semibold mb-4">Novo Cadastro</h2>
             <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4">
@@ -67,7 +65,6 @@ export default function MembersPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                 />
-                {/* Campo de Data de Nascimento */}
                 <div className="flex flex-col">
                     <span className="text-xs text-gray-500 mb-1">Nascimento</span>
                     <input 
@@ -88,7 +85,6 @@ export default function MembersPage() {
             </form>
         </div>
 
-        {/* Lista */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <table className="w-full text-left">
                 <thead className="bg-gray-50 border-b">
@@ -106,14 +102,16 @@ export default function MembersPage() {
                         members?.map((m) => (
                             <tr key={m.id} className="border-b hover:bg-gray-50">
                                 <td className="p-4 font-bold text-gray-800">{m.name}</td>
-                                <td className="p-4 text-gray-600">{m.phone || "-"}</td>
+                                {/* CORREÇÃO 2: Usamos ?? em vez de || */}
+                                <td className="p-4 text-gray-600">{m.phone ?? "-"}</td>
                                 <td className="p-4 text-gray-600">
                                     {m.birthDate ? m.birthDate.toLocaleDateString() : "-"}
                                 </td>
                                 <td className="p-4 text-right">
                                     <button 
                                         onClick={() => {
-                                            if(confirm("Deseja excluir?")) deleteMutation.mutate({ id: m.id })
+                                            // Adicionamos void aqui também
+                                            if(confirm("Deseja excluir?")) void deleteMutation.mutate({ id: m.id })
                                         }}
                                         className="text-red-500 hover:text-red-700 font-bold text-sm"
                                     >

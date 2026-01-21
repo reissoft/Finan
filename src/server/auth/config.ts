@@ -6,22 +6,15 @@ import { db } from "~/server/db";
 
 /**
  * Module augmentation for `next-auth` types.
- * Allows us to add custom properties to the `session` object and keep type
- * safety.
  */
 declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      // ...other properties
-      // role: UserRole;
     } & DefaultSession["user"];
   }
 }
 
-/**
- * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
- */
 export const authConfig: NextAuthConfig = {
   providers: [
     CredentialsProvider({
@@ -31,8 +24,7 @@ export const authConfig: NextAuthConfig = {
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        // --- A CORREÇÃO ESTÁ AQUI NA LINHA ABAIXO ---
-        // Usamos ?. para verificar se credentials existe E se tem email
+        // Validação 1: Entrada de dados
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
@@ -41,7 +33,9 @@ export const authConfig: NextAuthConfig = {
           where: { email: credentials.email as string },
         });
 
-        if (!user || !user.password) {
+        // --- CORREÇÃO AQUI (Linha 44) ---
+        // Em vez de (!user || !user.password), usamos apenas !user?.password
+        if (!user?.password) {
           throw new Error("Usuário não encontrado.");
         }
 

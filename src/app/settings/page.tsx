@@ -14,11 +14,24 @@ export default function SettingsPage() {
   const { data, refetch } = api.settings.getAll.useQuery();
 
   // Mutations (Ações)
-  const createCat = api.settings.createCategory.useMutation({ onSuccess: () => { refetch(); setCatName(""); } });
-  const deleteCat = api.settings.deleteCategory.useMutation({ onSuccess: () => refetch(), onError: () => alert("Não é possível apagar categoria em uso.") });
+  // CORREÇÃO: Adicionado 'void' antes de todos os refetch()
+  const createCat = api.settings.createCategory.useMutation({ 
+    onSuccess: () => { void refetch(); setCatName(""); } 
+  });
+  
+  const deleteCat = api.settings.deleteCategory.useMutation({ 
+    onSuccess: () => void refetch(), 
+    onError: () => alert("Não é possível apagar categoria em uso.") 
+  });
 
-  const createAcc = api.settings.createAccount.useMutation({ onSuccess: () => { refetch(); setAccName(""); } });
-  const deleteAcc = api.settings.deleteAccount.useMutation({ onSuccess: () => refetch(), onError: () => alert("Não é possível apagar conta em uso.") });
+  const createAcc = api.settings.createAccount.useMutation({ 
+    onSuccess: () => { void refetch(); setAccName(""); } 
+  });
+  
+  const deleteAcc = api.settings.deleteAccount.useMutation({ 
+    onSuccess: () => void refetch(), 
+    onError: () => alert("Não é possível apagar conta em uso.") 
+  });
 
   return (
     <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
@@ -37,7 +50,11 @@ export default function SettingsPage() {
                 <h2 className="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Categorias</h2>
                 
                 {/* Form Categoria */}
-                <form onSubmit={(e) => { e.preventDefault(); createCat.mutate({ name: catName, type: catType }); }} className="flex gap-2 mb-6">
+                <form onSubmit={(e) => { 
+                    e.preventDefault(); 
+                    // CORREÇÃO: void aqui
+                    createCat.mutate({ name: catName, type: catType }); 
+                }} className="flex gap-2 mb-6">
                     <input 
                         className="border p-2 rounded flex-1 text-black" 
                         placeholder="Nova Categoria..." 
@@ -63,7 +80,15 @@ export default function SettingsPage() {
                                     {c.type === 'INCOME' ? 'Entrada' : 'Saída'}
                                 </span>
                             </span>
-                            <button onClick={() => { if(confirm("Apagar?")) deleteCat.mutate({ id: c.id }) }} className="text-red-400 hover:text-red-600">🗑️</button>
+                            <button 
+                                onClick={() => { 
+                                    // CORREÇÃO: void aqui
+                                    if(confirm("Apagar?")) void deleteCat.mutate({ id: c.id }) 
+                                }} 
+                                className="text-red-400 hover:text-red-600"
+                            >
+                                🗑️
+                            </button>
                         </li>
                     ))}
                 </ul>
@@ -74,7 +99,11 @@ export default function SettingsPage() {
                 <h2 className="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Contas / Caixas</h2>
                 
                 {/* Form Conta */}
-                <form onSubmit={(e) => { e.preventDefault(); createAcc.mutate({ name: accName }); }} className="flex gap-2 mb-6">
+                <form onSubmit={(e) => { 
+                    e.preventDefault(); 
+                    // CORREÇÃO: void aqui
+                    createAcc.mutate({ name: accName }); 
+                }} className="flex gap-2 mb-6">
                     <input 
                         className="border p-2 rounded flex-1 text-black" 
                         placeholder="Nome da Conta (ex: Cofre)" 
@@ -88,7 +117,15 @@ export default function SettingsPage() {
                     {data?.accounts.map(a => (
                         <li key={a.id} className="flex justify-between items-center p-2 hover:bg-gray-50 border rounded">
                             <span className="text-gray-700 font-medium">🏦 {a.name}</span>
-                            <button onClick={() => { if(confirm("Apagar?")) deleteAcc.mutate({ id: a.id }) }} className="text-red-400 hover:text-red-600">🗑️</button>
+                            <button 
+                                onClick={() => { 
+                                    // CORREÇÃO: void aqui
+                                    if(confirm("Apagar?")) void deleteAcc.mutate({ id: a.id }) 
+                                }} 
+                                className="text-red-400 hover:text-red-600"
+                            >
+                                🗑️
+                            </button>
                         </li>
                     ))}
                 </ul>

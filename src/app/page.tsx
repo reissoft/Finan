@@ -53,7 +53,7 @@ export default async function Home({ searchParams }: Props) {
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
 
-        <MonthSelector />
+        
 
         <div className="flex items-center gap-4">
           <Link
@@ -65,6 +65,12 @@ export default async function Home({ searchParams }: Props) {
           <Link href="/settings" className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm">
             ⚙️ Configurações
           </Link>
+          <Link 
+  href="/reports" 
+  className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full font-bold hover:bg-purple-200 transition text-sm"
+>
+  📊 Relatórios
+</Link>
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
           </div>
@@ -76,7 +82,9 @@ export default async function Home({ searchParams }: Props) {
           </Link>
         </div>
       </div>
-
+      
+<MonthSelector />
+<br></br>
       <div className="w-full max-w-4xl space-y-6">
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">

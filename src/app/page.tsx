@@ -5,6 +5,7 @@ import { TransactionItem } from "./_components/transaction-item";
 import { AuthForm } from "./_components/auth-form";
 import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
+import { SignOutButton } from "./_components/sign-out-button";
 
 // 1. MUDANÇA NO TIPO (Adicionamos Promise<...>)
 type Props = {
@@ -74,12 +75,7 @@ export default async function Home({ searchParams }: Props) {
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
           </div>
-          <Link
-            href="/api/auth/signout"
-            className="bg-red-100 text-red-600 px-4 py-2 rounded text-sm font-bold hover:bg-red-200"
-          >
-            Sair
-          </Link>
+          <SignOutButton />
         </div>
       </div>
       

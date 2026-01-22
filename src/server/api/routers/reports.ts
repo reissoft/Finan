@@ -2,6 +2,10 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const reportsRouter = createTRPCRouter({
+  
+  // ==========================================================
+  // 1. RELATÓRIO SIMPLES (DASHBOARD)
+  // ==========================================================
   getFinancialReport: protectedProcedure
     .input(z.object({
       startDate: z.date(),
@@ -11,19 +15,16 @@ export const reportsRouter = createTRPCRouter({
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
 
-      // 1. Busca todas as transações no período
+      // Busca transações do período
       const transactions = await ctx.db.transaction.findMany({
         where: {
           tenantId: user.tenantId,
-          date: {
-            gte: input.startDate, // Maior ou igual data inicial
-            lte: input.endDate,   // Menor ou igual data final
-          },
+          date: { gte: input.startDate, lte: input.endDate },
         },
         include: { category: true },
       });
 
-      // 2. Agrupa os dados
+      // Agrupa os dados
       const incomeMap = new Map<string, number>();
       const expenseMap = new Map<string, number>();
       let totalIncome = 0;
@@ -42,7 +43,6 @@ export const reportsRouter = createTRPCRouter({
         }
       }
 
-      // 3. Formata para enviar para tela
       const incomeByCat = Array.from(incomeMap.entries()).map(([name, value]) => ({ name, value }));
       const expenseByCat = Array.from(expenseMap.entries()).map(([name, value]) => ({ name, value }));
 
@@ -56,10 +56,9 @@ export const reportsRouter = createTRPCRouter({
       };
     }),
 
-    // ... (Mantenha a função getFinancialReport igualzinha estava)
-
-  // ... dentro de reportsRouter ...
-
+  // ==========================================================
+  // 2. BALANCETE (Com Saldo Anterior Calculado)
+  // ==========================================================
   getBalanceSheet: protectedProcedure
     .input(z.object({
       startDate: z.date(),
@@ -69,27 +68,32 @@ export const reportsRouter = createTRPCRouter({
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
 
-      // 1.a Buscar Saldo Inicial das Contas (O valor que já existia antes de usar o sistema)
+      // --- CÁLCULO DO SALDO ANTERIOR (O CORAÇÃO DO FIX) ---
+      
+      // A. Saldo Inicial das Contas (O que já tinha no banco antes do sistema)
       const accounts = await ctx.db.account.aggregate({
         where: { tenantId: user.tenantId },
         _sum: { initialBalance: true }
       });
       const totalInitial = Number(accounts._sum.initialBalance) || 0;
 
-      // 1.b Calcular Movimentações Antigas (Tudo antes da data de início)
+      // B. Entradas Antigas (Tudo antes da data inicial do filtro)
       const pastIncome = await ctx.db.transaction.aggregate({
         where: { tenantId: user.tenantId, date: { lt: input.startDate }, type: "INCOME" },
         _sum: { amount: true }
       });
+
+      // C. Saídas Antigas (Tudo antes da data inicial do filtro)
       const pastExpense = await ctx.db.transaction.aggregate({
         where: { tenantId: user.tenantId, date: { lt: input.startDate }, type: "EXPENSE" },
         _sum: { amount: true }
       });
       
-      // CÁLCULO FINAL DO SALDO ANTERIOR CORRIGIDO
+      // D. Saldo Anterior Final = Inicial + Entradas Antigas - Saídas Antigas
       const previousBalance = totalInitial + (Number(pastIncome._sum.amount) || 0) - (Number(pastExpense._sum.amount) || 0);
 
-      // 2. Buscar Movimentação do Mês (Igual anterior)
+      // --- DADOS DO PERÍODO SELECIONADO ---
+      
       const transactions = await ctx.db.transaction.findMany({
         where: {
           tenantId: user.tenantId,
@@ -98,7 +102,6 @@ export const reportsRouter = createTRPCRouter({
         include: { category: true },
       });
 
-      // 3. Agrupar por Categoria (Igual anterior)
       const incomeMap = new Map<string, number>();
       const expenseMap = new Map<string, number>();
       let periodIncome = 0;
@@ -125,16 +128,15 @@ export const reportsRouter = createTRPCRouter({
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      // 4. Buscar Dados da Igreja (Igual anterior)
+      // Busca Dados da Igreja
       const tenant = await ctx.db.tenant.findUnique({
         where: { id: user.tenantId }
       });
 
-      // 5. Buscar Tesoureiro (Igual anterior)
+      // Busca Nome do Tesoureiro
       let treasurerRole = await ctx.db.staffRole.findFirst({
         where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
       });
-
       if (!treasurerRole) {
         treasurerRole = await ctx.db.staffRole.findFirst({
             where: { tenantId: user.tenantId },
@@ -145,8 +147,8 @@ export const reportsRouter = createTRPCRouter({
       let treasurerName = "";
       if (treasurerRole) {
           const staffMember = await ctx.db.staff.findFirst({
-              where: { tenantId: user.tenantId, roleId: treasurerRole.id },
-              orderBy: { createdAt: 'asc' } 
+            where: { tenantId: user.tenantId, roleId: treasurerRole.id },
+            orderBy: { createdAt: 'asc' } 
           });
           if (staffMember) treasurerName = staffMember.name.toUpperCase();
       }
@@ -156,19 +158,22 @@ export const reportsRouter = createTRPCRouter({
         tenantDesc: tenant?.description?.toUpperCase(),
         tenantCity: tenant?.city?.toUpperCase() ?? "CIDADE",
         tenantState: tenant?.state?.toUpperCase() ?? "UF",
-        cite_start: previousBalance, // Agora inclui o saldo inicial das contas [cite: 11]
+        
+        previousBalance,
         periodIncome,
         periodExpense,
-        currentBalance: previousBalance + periodIncome - periodExpense,
-        result: periodIncome - periodExpense,
+        currentBalance: previousBalance + periodIncome - periodExpense, // Saldo Final
+        result: periodIncome - periodExpense, // Resultado do Exercício
+        
         incomeList,
         expenseList,
         treasurerName
       };
     }),
-    // ... (código anterior)
 
-  // --- NOVO: LIVRO CAIXA (Detalhado) ---
+  // ==========================================================
+  // 3. LIVRO CAIXA (Extrato Detalhado)
+  // ==========================================================
   getCashBook: protectedProcedure
     .input(z.object({
       startDate: z.date(),
@@ -178,7 +183,7 @@ export const reportsRouter = createTRPCRouter({
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
 
-      // 1. Saldo Anterior (Contas Iniciais + Movimentações Antigas)
+      // --- REUTILIZA O CÁLCULO DO SALDO ANTERIOR ---
       const accounts = await ctx.db.account.aggregate({
         where: { tenantId: user.tenantId },
         _sum: { initialBalance: true }
@@ -196,17 +201,16 @@ export const reportsRouter = createTRPCRouter({
       
       const previousBalance = totalInitial + (Number(pastIncome._sum.amount) || 0) - (Number(pastExpense._sum.amount) || 0);
 
-      // 2. Transações do Período (Ordenadas por Data)
+      // --- DADOS DETALHADOS ---
       const transactions = await ctx.db.transaction.findMany({
         where: {
           tenantId: user.tenantId,
           date: { gte: input.startDate, lte: input.endDate },
         },
         include: { category: true },
-        orderBy: { date: 'asc' } // Cronológico
+        orderBy: { date: 'asc' } // Ordem Cronológica para o Livro Caixa
       });
 
-      // 3. Cálculos do Período
       let totalCredits = 0;
       let totalDebits = 0;
 
@@ -219,13 +223,13 @@ export const reportsRouter = createTRPCRouter({
           id: t.id,
           date: t.date,
           categoryName: t.category.name.toUpperCase(),
-          description: t.description?.toUpperCase() || t.category.name.toUpperCase(), // Se não tiver descrição, repete a categoria
+          description: t.description?.toUpperCase() || t.category.name.toUpperCase(),
           value: val,
-          type: t.type // INCOME ou EXPENSE
+          type: t.type
         };
       });
 
-      // 4. Dados da Igreja e Tesoureiro
+      // Dados Administrativos (Igreja/Tesoureiro)
       const tenant = await ctx.db.tenant.findUnique({ where: { id: user.tenantId } });
 
       let treasurerRole = await ctx.db.staffRole.findFirst({
@@ -240,8 +244,8 @@ export const reportsRouter = createTRPCRouter({
       let treasurerName = "";
       if (treasurerRole) {
           const staffMember = await ctx.db.staff.findFirst({
-              where: { tenantId: user.tenantId, roleId: treasurerRole.id },
-              orderBy: { createdAt: 'asc' } 
+            where: { tenantId: user.tenantId, roleId: treasurerRole.id },
+            orderBy: { createdAt: 'asc' } 
           });
           if (staffMember) treasurerName = staffMember.name.toUpperCase();
       }
@@ -251,19 +255,21 @@ export const reportsRouter = createTRPCRouter({
         tenantDesc: tenant?.description?.toUpperCase(),
         tenantCity: tenant?.city?.toUpperCase() ?? "CIDADE",
         tenantState: tenant?.state?.toUpperCase() ?? "UF",
+        
         previousBalance,
         totalCredits,
         totalDebits,
         result: totalCredits - totalDebits,
         currentBalance: previousBalance + (totalCredits - totalDebits),
+        
         transactions: formattedTransactions,
         treasurerName
       };
     }),
 
-    // ... (código anterior)
-
-  // --- NOVO: RELATÓRIO DE CONTAS A PAGAR ---
+  // ==========================================================
+  // 4. RELATÓRIO DE CONTAS A PAGAR
+  // ==========================================================
   getPayablesReport: protectedProcedure
     .input(z.object({
       startDate: z.date(),
@@ -273,7 +279,6 @@ export const reportsRouter = createTRPCRouter({
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
 
-      // 1. Buscar Contas pelo Vencimento
       const payables = await ctx.db.accountPayable.findMany({
         where: {
           tenantId: user.tenantId,
@@ -283,7 +288,6 @@ export const reportsRouter = createTRPCRouter({
         orderBy: { dueDate: 'asc' }
       });
 
-      // 2. Calcular Totais
       let totalPending = 0;
       let totalPaid = 0;
       
@@ -303,7 +307,6 @@ export const reportsRouter = createTRPCRouter({
         };
       });
 
-      // 3. Dados da Igreja e Tesoureiro (Padrão)
       const tenant = await ctx.db.tenant.findUnique({ where: { id: user.tenantId } });
 
       let treasurerRole = await ctx.db.staffRole.findFirst({
@@ -318,8 +321,8 @@ export const reportsRouter = createTRPCRouter({
       let treasurerName = "";
       if (treasurerRole) {
           const staffMember = await ctx.db.staff.findFirst({
-              where: { tenantId: user.tenantId, roleId: treasurerRole.id },
-              orderBy: { createdAt: 'asc' } 
+            where: { tenantId: user.tenantId, roleId: treasurerRole.id },
+            orderBy: { createdAt: 'asc' } 
           });
           if (staffMember) treasurerName = staffMember.name.toUpperCase();
       }
@@ -337,6 +340,3 @@ export const reportsRouter = createTRPCRouter({
       };
     }),
 });
-
-
-

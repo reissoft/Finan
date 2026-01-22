@@ -29,6 +29,8 @@ model Tenant {
     categories   Category[]
     transactions transaction[]
     accounts     Account[] // Contas bancárias (Caixinha, Santander, etc)
+    staff        Staff[]
+    staffRoles StaffRole[]
 
     @@map("tenants")
 }
@@ -200,4 +202,45 @@ model VerificationToken {
 
     @@unique([identifier, token])
     @@map("verification_tokens")
+}
+
+model StaffRole {
+    id        String   @id @default(cuid())
+    name      String   // Ex: "Pastor", "Tesoureiro", "Zelador"
+    
+    tenantId  String
+    tenant    Tenant   @relation(fields: [tenantId], references: [id])
+    
+    staff     Staff[]  // Quem tem esse cargo
+
+    @@index([tenantId])
+}
+
+model Staff {
+    id        String   @id @default(cuid())
+    name      String
+    
+    roleId    String
+    role      StaffRole @relation(fields: [roleId], references: [id])
+    
+    phone     String?
+    email     String?
+
+    // Dados Financeiros
+    isSalaried Boolean  @default(false)
+    salary     Decimal? @default(0)     // Salário Bruto
+    inss       Decimal? @default(0)     // Valor INSS (R$)
+    fgts       Decimal? @default(0)     // Valor FGTS (R$)
+    
+
+    otherTaxes Decimal? @default(0)     // Outras Taxas (em %)
+    
+    tenantId  String
+    tenant    Tenant   @relation(fields: [tenantId], references: [id])
+    paymentDay Int?     // Dia do mês (1 a 31)
+    
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([tenantId])
 }

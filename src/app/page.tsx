@@ -72,6 +72,12 @@ export default async function Home({ searchParams }: Props) {
 >
   📊 Relatórios
 </Link>
+<Link 
+  href="/staff" 
+  className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-bold hover:bg-orange-200 transition text-sm"
+>
+  👔 Equipe
+</Link>
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
           </div>

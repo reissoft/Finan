@@ -57,7 +57,21 @@ export default async function Home({ searchParams }: Props) {
         
 
         <div className="flex items-center gap-4">
-          <Link
+          
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
+          </div>
+          <SignOutButton />
+        </div>
+
+        
+        
+      </div>
+      
+<div className="w-full max-w-4xl space-y-6">
+        <div className="grid grid-cols-3 gap-4"></div>
+
+<Link
             href="/members"
             className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm"
           >
@@ -84,13 +98,9 @@ export default async function Home({ searchParams }: Props) {
 >
   💸 Contas a Pagar
 </Link>
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
-          </div>
-          <SignOutButton />
-        </div>
-      </div>
-      
+
+</div>
+<br></br>
 <MonthSelector />
 <br></br>
       <div className="w-full max-w-4xl space-y-6">

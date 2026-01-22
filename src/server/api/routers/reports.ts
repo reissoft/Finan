@@ -260,6 +260,82 @@ export const reportsRouter = createTRPCRouter({
         treasurerName
       };
     }),
+
+    // ... (código anterior)
+
+  // --- NOVO: RELATÓRIO DE CONTAS A PAGAR ---
+  getPayablesReport: protectedProcedure
+    .input(z.object({
+      startDate: z.date(),
+      endDate: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user?.tenantId) throw new Error("Sem organização");
+
+      // 1. Buscar Contas pelo Vencimento
+      const payables = await ctx.db.accountPayable.findMany({
+        where: {
+          tenantId: user.tenantId,
+          dueDate: { gte: input.startDate, lte: input.endDate },
+        },
+        include: { category: true },
+        orderBy: { dueDate: 'asc' }
+      });
+
+      // 2. Calcular Totais
+      let totalPending = 0;
+      let totalPaid = 0;
+      
+      const formattedPayables = payables.map(p => {
+        const val = Number(p.amount);
+        if (p.isPaid) totalPaid += val;
+        else totalPending += val;
+
+        return {
+          id: p.id,
+          dueDate: p.dueDate,
+          description: p.description.toUpperCase(),
+          categoryName: p.category.name.toUpperCase(),
+          value: val,
+          isPaid: p.isPaid,
+          paidAt: p.paidAt
+        };
+      });
+
+      // 3. Dados da Igreja e Tesoureiro (Padrão)
+      const tenant = await ctx.db.tenant.findUnique({ where: { id: user.tenantId } });
+
+      let treasurerRole = await ctx.db.staffRole.findFirst({
+        where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
+      });
+      if (!treasurerRole) {
+        treasurerRole = await ctx.db.staffRole.findFirst({
+            where: { tenantId: user.tenantId },
+            orderBy: { name: 'asc' }
+        });
+      }
+      let treasurerName = "";
+      if (treasurerRole) {
+          const staffMember = await ctx.db.staff.findFirst({
+              where: { tenantId: user.tenantId, roleId: treasurerRole.id },
+              orderBy: { createdAt: 'asc' } 
+          });
+          if (staffMember) treasurerName = staffMember.name.toUpperCase();
+      }
+
+      return {
+        tenantName: tenant?.name?.toUpperCase() ?? "MINHA IGREJA",
+        tenantDesc: tenant?.description?.toUpperCase(),
+        tenantCity: tenant?.city?.toUpperCase() ?? "CIDADE",
+        tenantState: tenant?.state?.toUpperCase() ?? "UF",
+        payables: formattedPayables,
+        totalPending,
+        totalPaid,
+        totalGeneral: totalPending + totalPaid,
+        treasurerName
+      };
+    }),
 });
 
 

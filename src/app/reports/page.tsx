@@ -38,6 +38,9 @@ export default function ReportsPage() {
                 <Link href="/reports/livro-caixa" className="bg-green-700 text-white px-4 py-2 rounded font-bold hover:bg-green-800 transition text-sm flex items-center gap-2">
                     📖 Livro Caixa
                 </Link>
+                <Link href="/reports/contas-pagar" className="bg-red-700 text-white px-4 py-2 rounded font-bold hover:bg-red-800 transition text-sm flex items-center gap-2">
+                    💸 A Pagar
+                </Link>
                 <Link href="/" className="text-gray-600 hover:text-blue-600 font-bold self-center">← Voltar</Link>
             </div>
         </div>

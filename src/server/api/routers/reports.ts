@@ -154,6 +154,8 @@ export const reportsRouter = createTRPCRouter({
       return {
         tenantName: tenant?.name?.toUpperCase() ?? "MINHA IGREJA",
         tenantDesc: tenant?.description?.toUpperCase(),
+        tenantCity: tenant?.city?.toUpperCase() ?? "CIDADE",
+        tenantState: tenant?.state?.toUpperCase() ?? "UF",
         cite_start: previousBalance, // Agora inclui o saldo inicial das contas [cite: 11]
         periodIncome,
         periodExpense,
@@ -161,6 +163,100 @@ export const reportsRouter = createTRPCRouter({
         result: periodIncome - periodExpense,
         incomeList,
         expenseList,
+        treasurerName
+      };
+    }),
+    // ... (código anterior)
+
+  // --- NOVO: LIVRO CAIXA (Detalhado) ---
+  getCashBook: protectedProcedure
+    .input(z.object({
+      startDate: z.date(),
+      endDate: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user?.tenantId) throw new Error("Sem organização");
+
+      // 1. Saldo Anterior (Contas Iniciais + Movimentações Antigas)
+      const accounts = await ctx.db.account.aggregate({
+        where: { tenantId: user.tenantId },
+        _sum: { initialBalance: true }
+      });
+      const totalInitial = Number(accounts._sum.initialBalance) || 0;
+
+      const pastIncome = await ctx.db.transaction.aggregate({
+        where: { tenantId: user.tenantId, date: { lt: input.startDate }, type: "INCOME" },
+        _sum: { amount: true }
+      });
+      const pastExpense = await ctx.db.transaction.aggregate({
+        where: { tenantId: user.tenantId, date: { lt: input.startDate }, type: "EXPENSE" },
+        _sum: { amount: true }
+      });
+      
+      const previousBalance = totalInitial + (Number(pastIncome._sum.amount) || 0) - (Number(pastExpense._sum.amount) || 0);
+
+      // 2. Transações do Período (Ordenadas por Data)
+      const transactions = await ctx.db.transaction.findMany({
+        where: {
+          tenantId: user.tenantId,
+          date: { gte: input.startDate, lte: input.endDate },
+        },
+        include: { category: true },
+        orderBy: { date: 'asc' } // Cronológico
+      });
+
+      // 3. Cálculos do Período
+      let totalCredits = 0;
+      let totalDebits = 0;
+
+      const formattedTransactions = transactions.map(t => {
+        const val = Number(t.amount);
+        if (t.type === "INCOME") totalCredits += val;
+        else totalDebits += val;
+
+        return {
+          id: t.id,
+          date: t.date,
+          categoryName: t.category.name.toUpperCase(),
+          description: t.description?.toUpperCase() || t.category.name.toUpperCase(), // Se não tiver descrição, repete a categoria
+          value: val,
+          type: t.type // INCOME ou EXPENSE
+        };
+      });
+
+      // 4. Dados da Igreja e Tesoureiro
+      const tenant = await ctx.db.tenant.findUnique({ where: { id: user.tenantId } });
+
+      let treasurerRole = await ctx.db.staffRole.findFirst({
+        where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
+      });
+      if (!treasurerRole) {
+        treasurerRole = await ctx.db.staffRole.findFirst({
+            where: { tenantId: user.tenantId },
+            orderBy: { name: 'asc' }
+        });
+      }
+      let treasurerName = "";
+      if (treasurerRole) {
+          const staffMember = await ctx.db.staff.findFirst({
+              where: { tenantId: user.tenantId, roleId: treasurerRole.id },
+              orderBy: { createdAt: 'asc' } 
+          });
+          if (staffMember) treasurerName = staffMember.name.toUpperCase();
+      }
+
+      return {
+        tenantName: tenant?.name?.toUpperCase() ?? "MINHA IGREJA",
+        tenantDesc: tenant?.description?.toUpperCase(),
+        tenantCity: tenant?.city?.toUpperCase() ?? "CIDADE",
+        tenantState: tenant?.state?.toUpperCase() ?? "UF",
+        previousBalance,
+        totalCredits,
+        totalDebits,
+        result: totalCredits - totalDebits,
+        currentBalance: previousBalance + (totalCredits - totalDebits),
+        transactions: formattedTransactions,
         treasurerName
       };
     }),

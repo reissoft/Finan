@@ -33,9 +33,11 @@ export default function ReportsPage() {
             <div className="flex gap-4">
                 {/* BOTÃO NOVO AQUI 👇 */}
                 <Link href="/reports/balancete" className="bg-blue-800 text-white px-4 py-2 rounded font-bold hover:bg-blue-900 transition text-sm flex items-center gap-2">
-                    📄 Ir para Balancete PDF
+                    📄 Balancete
                 </Link>
-                
+                <Link href="/reports/livro-caixa" className="bg-green-700 text-white px-4 py-2 rounded font-bold hover:bg-green-800 transition text-sm flex items-center gap-2">
+                    📖 Livro Caixa
+                </Link>
                 <Link href="/" className="text-gray-600 hover:text-blue-600 font-bold self-center">← Voltar</Link>
             </div>
         </div>

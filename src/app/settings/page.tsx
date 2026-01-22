@@ -9,6 +9,8 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState("");
   const [orgDesc, setOrgDesc] = useState("");
   const [orgLogo, setOrgLogo] = useState("");
+  const [orgCity, setOrgCity] = useState("");
+  const [orgState, setOrgState] = useState("");
 
   // --- STATES DE CATEGORIAS/CONTAS ---
   const [catName, setCatName] = useState("");
@@ -24,6 +26,8 @@ export default function SettingsPage() {
       setOrgName(data.tenant.name);
       setOrgDesc(data.tenant.description ?? "");
       setOrgLogo(data.tenant.logoUrl ?? "");
+      setOrgCity(data.tenant.city ?? "");
+      setOrgState(data.tenant.state ?? "");
     }
   }, [data]);
 
@@ -62,7 +66,9 @@ export default function SettingsPage() {
     updateTenant.mutate({
       name: orgName,
       description: orgDesc,
-      logoUrl: orgLogo
+      logoUrl: orgLogo,
+      city: orgCity,
+      state: orgState
     });
   }
 
@@ -101,6 +107,27 @@ export default function SettingsPage() {
                             value={orgDesc} onChange={e => setOrgDesc(e.target.value)}
                         />
                     </div>
+                    <div className="flex gap-4">
+      <div className="flex-1">
+          <label className="block text-sm font-bold text-gray-700 mb-1">Cidade</label>
+          <input 
+              type="text" 
+              placeholder="Ex: Jacobina"
+              className="border p-2 rounded w-full text-black"
+              value={orgCity} onChange={e => setOrgCity(e.target.value)}
+          />
+      </div>
+      <div className="w-24">
+          <label className="block text-sm font-bold text-gray-700 mb-1">UF</label>
+          <input 
+              type="text" 
+              maxLength={2}
+              placeholder="BA"
+              className="border p-2 rounded w-full text-black uppercase"
+              value={orgState} onChange={e => setOrgState(e.target.value.toUpperCase())}
+          />
+      </div>
+  </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Link do Logotipo (URL)</label>
                         <input 

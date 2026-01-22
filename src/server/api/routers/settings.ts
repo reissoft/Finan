@@ -31,6 +31,8 @@ export const settingsRouter = createTRPCRouter({
       name: z.string().min(1),
       description: z.string().optional(),
       logoUrl: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
@@ -42,6 +44,8 @@ export const settingsRouter = createTRPCRouter({
           name: input.name,
           description: input.description,
           logoUrl: input.logoUrl,
+          city: input.city,
+          state: input.state,
         },
       });
     }),

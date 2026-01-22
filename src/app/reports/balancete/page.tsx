@@ -63,7 +63,6 @@ export default function BalancetePage() {
         
         {/* CABEÇALHO [cite: 26, 27, 28] */}
         <div className="text-center font-bold mb-6">
-            <p className="text-sm">IGREJA PRESBITERIANA DO BRASIL</p>
             <p className="text-[10px] text-gray-600 my-0.5">{data?.tenantDesc ?? "SÍNODO / PRESBITÉRIO"}</p>
             <p className="text-base mt-1">{data?.tenantName}</p>
             <div className="border-b-2 border-black w-full mt-4 mb-2"></div>
@@ -154,7 +153,7 @@ export default function BalancetePage() {
             </div>
             <div>
                 <div className="border-t border-black pt-2 mx-8">
-                    {new Date().toLocaleDateString('pt-BR')}
+                    {data?.tenantCity} ({data?.tenantState}), {new Date().toLocaleDateString('pt-BR')}
                 </div>
                 <p className="text-[10px] mt-1">DATA EMISSÃO</p>
             </div>

@@ -20,6 +20,8 @@ model Tenant {
     name        String
     slug        String   @unique
     
+    city        String?  // Ex: Jacobina
+    state       String?  // Ex: BA
     // --- NOVOS CAMPOS ---
     description String?  // Descrição ou Lema da Igreja
     logoUrl     String?  // Link da imagem do logo

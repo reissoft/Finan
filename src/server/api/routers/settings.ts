@@ -2,10 +2,15 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const settingsRouter = createTRPCRouter({
-  // --- LEITURA GERAL ---
+  // --- LEITURA GERAL (AGORA COM DADOS DO TENANT) ---
   getAll: protectedProcedure.query(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
-    if (!user?.tenantId) return { categories: [], accounts: [] };
+    if (!user?.tenantId) return { categories: [], accounts: [], tenant: null };
+
+    // Busca dados da Igreja
+    const tenant = await ctx.db.tenant.findUnique({
+      where: { id: user.tenantId }
+    });
 
     const categories = await ctx.db.category.findMany({
       where: { tenantId: user.tenantId },
@@ -17,8 +22,29 @@ export const settingsRouter = createTRPCRouter({
       orderBy: { name: "asc" },
     });
 
-    return { categories, accounts };
+    return { categories, accounts, tenant };
   }),
+
+  // --- NOVA FUNÇÃO: ATUALIZAR DADOS DA IGREJA ---
+  updateTenant: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      description: z.string().optional(),
+      logoUrl: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user?.tenantId) throw new Error("Sem organização");
+
+      return ctx.db.tenant.update({
+        where: { id: user.tenantId },
+        data: {
+          name: input.name,
+          description: input.description,
+          logoUrl: input.logoUrl,
+        },
+      });
+    }),
 
   // --- CATEGORIAS ---
   createCategory: protectedProcedure
@@ -39,7 +65,6 @@ export const settingsRouter = createTRPCRouter({
   deleteCategory: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Nota: Isso pode falhar se já existirem transações usando essa categoria
       return ctx.db.category.deleteMany({
         where: { id: input.id, tenant: { users: { some: { id: ctx.session.user.id } } } },
       });

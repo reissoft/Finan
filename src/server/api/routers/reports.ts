@@ -55,4 +55,116 @@ export const reportsRouter = createTRPCRouter({
         transactionCount: transactions.length
       };
     }),
+
+    // ... (Mantenha a função getFinancialReport igualzinha estava)
+
+  // ... dentro de reportsRouter ...
+
+  getBalanceSheet: protectedProcedure
+    .input(z.object({
+      startDate: z.date(),
+      endDate: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user?.tenantId) throw new Error("Sem organização");
+
+      // 1.a Buscar Saldo Inicial das Contas (O valor que já existia antes de usar o sistema)
+      const accounts = await ctx.db.account.aggregate({
+        where: { tenantId: user.tenantId },
+        _sum: { initialBalance: true }
+      });
+      const totalInitial = Number(accounts._sum.initialBalance) || 0;
+
+      // 1.b Calcular Movimentações Antigas (Tudo antes da data de início)
+      const pastIncome = await ctx.db.transaction.aggregate({
+        where: { tenantId: user.tenantId, date: { lt: input.startDate }, type: "INCOME" },
+        _sum: { amount: true }
+      });
+      const pastExpense = await ctx.db.transaction.aggregate({
+        where: { tenantId: user.tenantId, date: { lt: input.startDate }, type: "EXPENSE" },
+        _sum: { amount: true }
+      });
+      
+      // CÁLCULO FINAL DO SALDO ANTERIOR CORRIGIDO
+      const previousBalance = totalInitial + (Number(pastIncome._sum.amount) || 0) - (Number(pastExpense._sum.amount) || 0);
+
+      // 2. Buscar Movimentação do Mês (Igual anterior)
+      const transactions = await ctx.db.transaction.findMany({
+        where: {
+          tenantId: user.tenantId,
+          date: { gte: input.startDate, lte: input.endDate },
+        },
+        include: { category: true },
+      });
+
+      // 3. Agrupar por Categoria (Igual anterior)
+      const incomeMap = new Map<string, number>();
+      const expenseMap = new Map<string, number>();
+      let periodIncome = 0;
+      let periodExpense = 0;
+
+      for (const t of transactions) {
+        const val = Number(t.amount);
+        const catName = t.category.name.toUpperCase();
+
+        if (t.type === "INCOME") {
+          periodIncome += val;
+          incomeMap.set(catName, (incomeMap.get(catName) ?? 0) + val);
+        } else {
+          periodExpense += val;
+          expenseMap.set(catName, (expenseMap.get(catName) ?? 0) + val);
+        }
+      }
+
+      const incomeList = Array.from(incomeMap.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const expenseList = Array.from(expenseMap.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // 4. Buscar Dados da Igreja (Igual anterior)
+      const tenant = await ctx.db.tenant.findUnique({
+        where: { id: user.tenantId }
+      });
+
+      // 5. Buscar Tesoureiro (Igual anterior)
+      let treasurerRole = await ctx.db.staffRole.findFirst({
+        where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
+      });
+
+      if (!treasurerRole) {
+        treasurerRole = await ctx.db.staffRole.findFirst({
+            where: { tenantId: user.tenantId },
+            orderBy: { name: 'asc' }
+        });
+      }
+
+      let treasurerName = "";
+      if (treasurerRole) {
+          const staffMember = await ctx.db.staff.findFirst({
+              where: { tenantId: user.tenantId, roleId: treasurerRole.id },
+              orderBy: { createdAt: 'asc' } 
+          });
+          if (staffMember) treasurerName = staffMember.name.toUpperCase();
+      }
+
+      return {
+        tenantName: tenant?.name?.toUpperCase() ?? "MINHA IGREJA",
+        tenantDesc: tenant?.description?.toUpperCase(),
+        cite_start: previousBalance, // Agora inclui o saldo inicial das contas [cite: 11]
+        periodIncome,
+        periodExpense,
+        currentBalance: previousBalance + periodIncome - periodExpense,
+        result: periodIncome - periodExpense,
+        incomeList,
+        expenseList,
+        treasurerName
+      };
+    }),
 });
+
+
+

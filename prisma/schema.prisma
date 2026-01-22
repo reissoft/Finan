@@ -16,21 +16,26 @@ datasource db {
 
 // A "Igreja" ou Cliente do seu SaaS
 model Tenant {
-    id        String   @id @default(cuid())
-    name      String
-    slug      String   @unique // Para usar na url tipo: app.seusistema.com/igreja-batista
-    plan      Plan     @default(FREE)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    id          String   @id @default(cuid())
+    name        String
+    slug        String   @unique
+    
+    // --- NOVOS CAMPOS ---
+    description String?  // Descrição ou Lema da Igreja
+    logoUrl     String?  // Link da imagem do logo
+    // --------------------
 
-    // Relacionamentos (Uma igreja tem vários...)
+    plan        Plan     @default(FREE)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
     users        User[]
     members      Member[]
     categories   Category[]
     transactions transaction[]
-    accounts     Account[] // Contas bancárias (Caixinha, Santander, etc)
-    staff        Staff[]
-    staffRoles StaffRole[]
+    accounts     Account[]
+    staff        Staff[]      // Relacionamento com Staff (que criamos antes)
+    staffRoles   StaffRole[]  // Relacionamento com Cargos (que criamos antes)
 
     @@map("tenants")
 }

@@ -78,6 +78,12 @@ export default async function Home({ searchParams }: Props) {
 >
   👔 Equipe
 </Link>
+<Link 
+  href="/payables" 
+  className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition text-sm"
+>
+  💸 Contas a Pagar
+</Link>
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
           </div>

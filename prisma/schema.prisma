@@ -38,6 +38,7 @@ model Tenant {
     accounts     Account[]
     staff        Staff[]      // Relacionamento com Staff (que criamos antes)
     staffRoles   StaffRole[]  // Relacionamento com Cargos (que criamos antes)
+    accountPayables AccountPayable[]
 
     @@map("tenants")
 }
@@ -113,6 +114,7 @@ model Category {
     tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
     transactions transaction[]
+    accountPayables AccountPayable[]
 
     @@index([tenantId])
     @@map("categories")
@@ -250,4 +252,28 @@ model Staff {
     updatedAt DateTime @updatedAt
 
     @@index([tenantId])
+}
+
+model AccountPayable {
+    id          String   @id @default(cuid())
+    description String
+    amount      Decimal  @db.Decimal(10, 2)
+    dueDate     DateTime // Data de Vencimento
+    
+    // Status do Pagamento
+    isPaid      Boolean  @default(false)
+    paidAt      DateTime? // Data que foi pago efetivamente
+    
+    // Relacionamentos
+    categoryId  String
+    category    Category @relation(fields: [categoryId], references: [id])
+    
+    tenantId    String
+    tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@index([tenantId])
+    @@index([dueDate])
 }

@@ -137,12 +137,11 @@ export const reportsRouter = createTRPCRouter({
       let treasurerRole = await ctx.db.staffRole.findFirst({
         where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
       });
-      if (!treasurerRole) {
-        treasurerRole = await ctx.db.staffRole.findFirst({
+      treasurerRole ??= await ctx.db.staffRole.findFirst({
             where: { tenantId: user.tenantId },
             orderBy: { name: 'asc' }
         });
-      }
+      
 
       let treasurerName = "";
       if (treasurerRole) {
@@ -223,7 +222,7 @@ export const reportsRouter = createTRPCRouter({
           id: t.id,
           date: t.date,
           categoryName: t.category.name.toUpperCase(),
-          description: t.description?.toUpperCase() || t.category.name.toUpperCase(),
+          description: t.description?.toUpperCase() ?? t.category.name.toUpperCase(),
           value: val,
           type: t.type
         };
@@ -235,12 +234,12 @@ export const reportsRouter = createTRPCRouter({
       let treasurerRole = await ctx.db.staffRole.findFirst({
         where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
       });
-      if (!treasurerRole) {
-        treasurerRole = await ctx.db.staffRole.findFirst({
+     
+        treasurerRole ??= await ctx.db.staffRole.findFirst({
             where: { tenantId: user.tenantId },
             orderBy: { name: 'asc' }
         });
-      }
+      
       let treasurerName = "";
       if (treasurerRole) {
           const staffMember = await ctx.db.staff.findFirst({
@@ -312,12 +311,12 @@ export const reportsRouter = createTRPCRouter({
       let treasurerRole = await ctx.db.staffRole.findFirst({
         where: { tenantId: user.tenantId, name: { contains: "Tesour", mode: "insensitive" } }
       });
-      if (!treasurerRole) {
-        treasurerRole = await ctx.db.staffRole.findFirst({
+      
+        treasurerRole ??= await ctx.db.staffRole.findFirst({
             where: { tenantId: user.tenantId },
             orderBy: { name: 'asc' }
         });
-      }
+      
       let treasurerName = "";
       if (treasurerRole) {
           const staffMember = await ctx.db.staff.findFirst({

@@ -83,7 +83,7 @@ export default function PayablesPage() {
       payMutation.mutate({
           id: selectedPayableId,
           accountId: payAccountId,
-          paidDate: new Date(payDate)
+          paidDate: payDate ? new Date(payDate) : new Date()
       });
   }
 

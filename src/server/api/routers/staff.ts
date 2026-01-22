@@ -66,13 +66,13 @@ export const staffRouter = createTRPCRouter({
           name: input.name,
           role: { connect: { id: input.roleId } },
           phone: input.phone,
-          email: input.email || null,
+          email: input.email && null,
           isSalaried: input.isSalaried,
-          salary: input.salary || 0,
-          inss: input.inss || 0,
-          fgts: input.fgts || 0,
-          otherTaxes: input.otherTaxes || 0,
-          paymentDay: input.paymentDay || null, // Salva o dia
+          salary: input.salary ?? 0,
+          inss: input.inss ?? 0,
+          fgts: input.fgts ?? 0,
+          otherTaxes: input.otherTaxes ?? 0,
+          paymentDay: input.paymentDay ?? null, // Salva o dia
           tenant: { connect: { id: user.tenantId } },
         },
       });

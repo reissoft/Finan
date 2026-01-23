@@ -41,8 +41,19 @@ export const authRouter = createTRPCRouter({
         { name: "Energia", type: "EXPENSE" },
         { name: "Água", type: "EXPENSE" },
         { name: "Manutenção", type: "EXPENSE" },
+        { name: "Salário", type: "EXPENSE" },
+        { name: "Imposto", type: "EXPENSE" },
       ]
     },
+
+    staffRoles:{
+      create: [
+        { name: "Pastor" },
+        { name: "Tesoureiro" },
+        { name: "Secretário" }
+      ]
+    },
+
     accounts: {
       create: [
         { name: "Caixa Físico", initialBalance: 0 },

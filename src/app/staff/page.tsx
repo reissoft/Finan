@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { GeneratePaymentButton } from "../_components/GeneratePaymentButton";
 
 export default function StaffPage() {
   // Dados Pessoais
@@ -166,7 +167,7 @@ export default function StaffPage() {
                             />
                         </div>
                         <div className="col-span-1">
-                            <label className="text-xs text-gray-500">INSS (R$)</label>
+                            <label className="text-xs text-gray-500">INSS (%)</label>
                             <input 
                                 type="number" step="0.01" placeholder="0,00"
                                 className="border p-2 rounded text-black w-full"
@@ -174,7 +175,7 @@ export default function StaffPage() {
                             />
                         </div>
                         <div className="col-span-1">
-                            <label className="text-xs text-gray-500">FGTS (R$)</label>
+                            <label className="text-xs text-gray-500">FGTS (%)</label>
                             <input 
                                 type="number" step="0.01" placeholder="0,00"
                                 className="border p-2 rounded text-black w-full"
@@ -189,7 +190,9 @@ export default function StaffPage() {
                                 value={otherTaxes} onChange={(e) => setOtherTaxes(e.target.value)}
                             />
                         </div>
+                        
                     </div>
+                    
                 )}
 
                 <button 
@@ -247,7 +250,13 @@ export default function StaffPage() {
                                     ) : (
                                         <span className="text-gray-400">Voluntário</span>
                                     )}
+                                    <GeneratePaymentButton 
+                                    staffId={s.id} 
+                                    isSalaried={s.isSalaried} 
+                                    staffName={s.name} 
+                                />
                                 </td>
+                                
                                 <td className="p-4 text-right">
                                     <button 
                                         onClick={() => { if(confirm("Excluir?")) void deleteStaff.mutate({ id: s.id }) }}

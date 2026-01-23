@@ -3,6 +3,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
 
+// --- FUNÇÃO AUXILIAR PARA LIMPAR CARACTERES ESPECIAIS XML ---
+const escapeXml = (unsafe: string | number | undefined | null) => {
+  if (unsafe === undefined || unsafe === null) return "";
+  return String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+};
+
 export default function BalancetePage() {
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -28,6 +39,70 @@ export default function BalancetePage() {
   // -----------------------------------------------------------
 
   const handlePrint = () => window.print();
+
+  // --- NOVA FUNÇÃO: GERAR E BAIXAR XML ---
+  const handleDownloadXML = () => {
+    if (!data) return;
+
+    // Cabeçalho do XML
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<Balancete>\n';
+    
+    // 1. Dados da Instituição
+    xml += '  <Cabecalho>\n';
+    xml += `    <Instituicao>${escapeXml(data.tenantName)}</Instituicao>\n`;
+    xml += `    <Descricao>${escapeXml(data.tenantDesc)}</Descricao>\n`;
+    xml += `    <Cidade>${escapeXml(data.tenantCity)}</Cidade>\n`;
+    xml += `    <Estado>${escapeXml(data.tenantState)}</Estado>\n`;
+    xml += `    <PeriodoInicio>${startDate}</PeriodoInicio>\n`;
+    xml += `    <PeriodoFim>${endDate}</PeriodoFim>\n`;
+    xml += `    <Tesoureiro>${escapeXml(signerName)}</Tesoureiro>\n`;
+    xml += '  </Cabecalho>\n';
+
+    // 2. Resumo Financeiro
+    xml += '  <Resumo>\n';
+    xml += `    <SaldoAnterior>${data.previousBalance.toFixed(2)}</SaldoAnterior>\n`;
+    xml += `    <TotalReceitas>${data.periodIncome.toFixed(2)}</TotalReceitas>\n`;
+    xml += `    <TotalDespesas>${data.periodExpense.toFixed(2)}</TotalDespesas>\n`;
+    xml += `    <ResultadoExercicio>${data.result.toFixed(2)}</ResultadoExercicio>\n`;
+    xml += `    <SaldoAtual>${data.currentBalance.toFixed(2)}</SaldoAtual>\n`;
+    xml += '  </Resumo>\n';
+
+    // 3. Lista de Receitas
+    xml += '  <Receitas>\n';
+    data.incomeList.forEach(item => {
+      xml += '    <Item>\n';
+      xml += `      <Conta>${escapeXml(item.name)}</Conta>\n`;
+      xml += `      <Valor>${item.value.toFixed(2)}</Valor>\n`;
+      xml += '    </Item>\n';
+    });
+    xml += '  </Receitas>\n';
+
+    // 4. Lista de Despesas
+    xml += '  <Despesas>\n';
+    data.expenseList.forEach(item => {
+      xml += '    <Item>\n';
+      xml += `      <Conta>${escapeXml(item.name)}</Conta>\n`;
+      xml += `      <Valor>${item.value.toFixed(2)}</Valor>\n`;
+      xml += '    </Item>\n';
+    });
+    xml += '  </Despesas>\n';
+
+    xml += '</Balancete>';
+
+    // Cria o arquivo virtual e dispara o download
+    const blob = new Blob([xml], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `balancete_${startDate}_${endDate}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  // ----------------------------------------
+
   const fmt = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
@@ -55,6 +130,9 @@ export default function BalancetePage() {
         </button>
         <button onClick={handlePrint} className="bg-gray-800 text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-black flex gap-2 items-center">
             🖨️ Imprimir
+        </button>
+        <button onClick={handleDownloadXML} disabled={!data} className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-green-700 disabled:opacity-50 flex gap-2 items-center">
+            📥 XML
         </button>
       </div>
 

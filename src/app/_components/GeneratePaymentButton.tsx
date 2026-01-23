@@ -17,7 +17,7 @@ export function GeneratePaymentButton({ staffId, isSalaried, staffName }: Props)
     onSuccess: () => {
       alert(`✅ Sucesso! Folha de pagamento de ${staffName} foi gerada.`);
       setIsLoading(false);
-      utils.reports.getPayablesReport.invalidate(); 
+      void utils.reports.getPayablesReport.invalidate(); 
     },
     onError: (error) => {
       alert(`❌ Erro ao gerar folha: ${error.message}`);

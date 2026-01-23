@@ -104,7 +104,7 @@ export const staffRouter = createTRPCRouter({
         where: { id: input.staffId },
       });
 
-      if (!staff || !staff.isSalaried) {
+      if (!staff?.isSalaried) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Funcionário não é remunerado." });
       }
 
@@ -148,12 +148,12 @@ export const staffRouter = createTRPCRouter({
       });
 
       // Se não achar, busca categorias genéricas de despesa para não dar erro
-      if (!catSalario) {
-         catSalario = await ctx.db.category.findFirst({ where: { tenantId: user.tenantId, type: "EXPENSE" } });
-      }
-      if (!catImpostos) {
-         catImpostos = catSalario; // Usa a mesma se não tiver de impostos
-      }
+      //if (!catSalario) {
+         catSalario ??= await ctx.db.category.findFirst({ where: { tenantId: user.tenantId, type: "EXPENSE" } });
+     // }
+      //if (!catImpostos) {
+         catImpostos ??= catSalario; // Usa a mesma se não tiver de impostos
+      //}
 
       if (!catSalario) throw new TRPCError({ code: "BAD_REQUEST", message: "Cadastre ao menos uma categoria de despesa." });
 
@@ -168,12 +168,12 @@ export const staffRouter = createTRPCRouter({
       const valorFgts = salarioBruto * (aliquotaFgts / 100);
       const valorOutros = salarioBruto * (aliquotaOutros / 100);
       
-      var salarioLiquido = salarioBruto - valorInss; // O que cai na conta do funcionário
-      salarioLiquido = salarioLiquido - valorOutros; // Já descontando outros impostos
+      const salarioLiquidop0 = salarioBruto - valorInss; // O que cai na conta do funcionário
+      const salarioLiquido = salarioLiquidop0 - valorOutros; // Já descontando outros impostos
 
       // 4. Define as Datas de Vencimento
       // Data do Salário (Dia configurado no staff)
-      const diaPagto = staff.paymentDay || 5; 
+      const diaPagto = staff.paymentDay ?? 5; 
       const vectoSalario = new Date(anoAtual, mesAtual, diaPagto);
       
       // Data do FGTS (Dia 7 fixo)
@@ -191,7 +191,7 @@ export const staffRouter = createTRPCRouter({
             description: `Salário Líquido - ${staff.name}`,
             amount: salarioLiquido,
             dueDate: vectoSalario,
-            categoryId: catSalario!.id,
+            categoryId: catSalario.id,
             staffId: staff.id,
             isPaid: false,
           }

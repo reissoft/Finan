@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
@@ -65,8 +66,17 @@ export const reportsRouter = createTRPCRouter({
       endDate: z.date(),
     }))
     .query(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id }, include: { tenant: true } });
       if (!user?.tenantId) throw new Error("Sem organização");
+
+
+      // --- TRAVA ---
+      if (user?.tenant?.plan === "FREE") {
+        throw new TRPCError({ 
+          code: "FORBIDDEN", 
+          message: "PLAN_LIMIT_REACHED" // Use um código curto para tratar no front
+        });
+      }
 
       // --- CÁLCULO DO SALDO ANTERIOR (O CORAÇÃO DO FIX) ---
       
@@ -179,8 +189,16 @@ export const reportsRouter = createTRPCRouter({
       endDate: z.date(),
     }))
     .query(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id }, include: { tenant: true } });
       if (!user?.tenantId) throw new Error("Sem organização");
+
+      // --- TRAVA ---
+      if (user?.tenant?.plan === "FREE") {
+        throw new TRPCError({ 
+          code: "FORBIDDEN", 
+          message: "PLAN_LIMIT_REACHED" // Use um código curto para tratar no front
+        });
+      }
 
       // --- REUTILIZA O CÁLCULO DO SALDO ANTERIOR ---
       const accounts = await ctx.db.account.aggregate({
@@ -275,8 +293,16 @@ export const reportsRouter = createTRPCRouter({
       endDate: z.date(),
     }))
     .query(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id }, include: { tenant: true } });
       if (!user?.tenantId) throw new Error("Sem organização");
+
+      // --- TRAVA ---
+      if (user?.tenant?.plan === "FREE") {
+        throw new TRPCError({ 
+          code: "FORBIDDEN", 
+          message: "PLAN_LIMIT_REACHED" // Use um código curto para tratar no front
+        });
+      }
 
       const payables = await ctx.db.accountPayable.findMany({
         where: {

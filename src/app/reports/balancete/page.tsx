@@ -25,30 +25,34 @@ export default function BalancetePage() {
   const [signerName, setSignerName] = useState("");
   const [signerRole, setSignerRole] = useState("TESOUREIRO(A)");
 
-  const { data, refetch, isFetching } = api.reports.getBalanceSheet.useQuery({
-    startDate: new Date(startDate ?? ""),
-    endDate: new Date(endDate ?? ""),
-  });
+  // --- MUDANÇA 1: Capturando erro e desligando retry ---
+  const { data, refetch, isFetching, isError, error } = api.reports.getBalanceSheet.useQuery(
+    {
+        startDate: new Date(startDate ?? ""),
+        endDate: new Date(endDate ?? ""),
+    },
+    {
+        retry: false, // Importante: Não tenta de novo se for erro de permissão
+        refetchOnWindowFocus: false,
+    }
+  );
 
-  // --- NOVO: EFEITO PARA PREENCHER O NOME AUTOMATICAMENTE ---
+  // --- EFEITO PARA PREENCHER O NOME AUTOMATICAMENTE ---
   useEffect(() => {
     if (data?.treasurerName) {
         setSignerName(data.treasurerName);
     }
   }, [data]);
-  // -----------------------------------------------------------
 
   const handlePrint = () => window.print();
 
-  // --- NOVA FUNÇÃO: GERAR E BAIXAR XML ---
+  // --- FUNÇÃO: GERAR E BAIXAR XML ---
   const handleDownloadXML = () => {
     if (!data) return;
 
-    // Cabeçalho do XML
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<Balancete>\n';
     
-    // 1. Dados da Instituição
     xml += '  <Cabecalho>\n';
     xml += `    <Instituicao>${escapeXml(data.tenantName)}</Instituicao>\n`;
     xml += `    <Descricao>${escapeXml(data.tenantDesc)}</Descricao>\n`;
@@ -59,7 +63,6 @@ export default function BalancetePage() {
     xml += `    <Tesoureiro>${escapeXml(signerName)}</Tesoureiro>\n`;
     xml += '  </Cabecalho>\n';
 
-    // 2. Resumo Financeiro
     xml += '  <Resumo>\n';
     xml += `    <SaldoAnterior>${data.previousBalance.toFixed(2)}</SaldoAnterior>\n`;
     xml += `    <TotalReceitas>${data.periodIncome.toFixed(2)}</TotalReceitas>\n`;
@@ -68,7 +71,6 @@ export default function BalancetePage() {
     xml += `    <SaldoAtual>${data.currentBalance.toFixed(2)}</SaldoAtual>\n`;
     xml += '  </Resumo>\n';
 
-    // 3. Lista de Receitas
     xml += '  <Receitas>\n';
     data.incomeList.forEach(item => {
       xml += '    <Item>\n';
@@ -78,7 +80,6 @@ export default function BalancetePage() {
     });
     xml += '  </Receitas>\n';
 
-    // 4. Lista de Despesas
     xml += '  <Despesas>\n';
     data.expenseList.forEach(item => {
       xml += '    <Item>\n';
@@ -90,7 +91,6 @@ export default function BalancetePage() {
 
     xml += '</Balancete>';
 
-    // Cria o arquivo virtual e dispara o download
     const blob = new Blob([xml], { type: 'text/xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -101,10 +101,62 @@ export default function BalancetePage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  // ----------------------------------------
 
   const fmt = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // =========================================================
+  // MUDANÇA 2: Renderização Condicional da Tela de Bloqueio
+  // =========================================================
+  if (isError) {
+    // Verifica se é o erro de plano que criamos no backend
+    const isPlanError = error.data?.code === "FORBIDDEN" || error.message.includes("PLAN_LIMIT_REACHED");
+
+    return (
+        <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
+            {/* Mantemos o menu superior para o usuário poder voltar */}
+            <div className="w-full max-w-[210mm] bg-white p-4 rounded-lg shadow mb-8 flex flex-wrap gap-4 items-center border-l-4 border-gray-400">
+                <div className="w-full flex justify-between">
+                    <h1 className="font-bold text-xl text-gray-500">Relatório Bloqueado</h1>
+                    <Link href="/reports" className="text-gray-500 hover:text-blue-600 font-bold text-sm">← Voltar aos Relatórios</Link>
+                </div>
+            </div>
+
+            {/* A TELA DE BLOQUEIO */}
+            <div className="flex flex-col items-center justify-center bg-white p-12 rounded-lg shadow-xl text-center max-w-lg mt-10">
+                <div className="text-6xl mb-6">
+                    {isPlanError ? "🔒" : "⚠️"}
+                </div>
+                
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                    {isPlanError ? "Funcionalidade Exclusiva PRO" : "Erro ao carregar"}
+                </h2>
+                
+                <p className="text-gray-600 mb-8 leading-relaxed">
+                    {isPlanError 
+                        ? "O Balancete Detalhado, Livro Caixa e Contas a Pagar são recursos exclusivos do plano PRO. Faça o upgrade da sua igreja para acessar relatórios avançados."
+                        : `Ocorreu um erro técnico: ${error.message}`
+                    }
+                </p>
+
+                {isPlanError && (
+                    <button className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
+                        ⭐ Quero ser PRO
+                    </button>
+                )}
+                
+                {!isPlanError && (
+                    <button onClick={() => refetch()} className="bg-gray-200 text-gray-800 px-6 py-2 rounded hover:bg-gray-300">
+                        Tentar Novamente
+                    </button>
+                )}
+            </div>
+        </main>
+    );
+  }
+
+  // =========================================================
+  // SE NÃO TIVER ERRO, RENDERIZA O RELATÓRIO NORMALMENTE
+  // =========================================================
   return (
     <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center print:bg-white print:p-0">
       
@@ -139,7 +191,7 @@ export default function BalancetePage() {
       {/* --- FOLHA A4 (O Relatório Real) --- */}
       <div className="w-full max-w-[210mm] bg-white p-[1cm] shadow-2xl print:shadow-none print:p-0 text-black font-sans text-xs uppercase">
         
-        {/* CABEÇALHO [cite: 26, 27, 28] */}
+        {/* CABEÇALHO */}
         <div className="text-center font-bold mb-6">
             <p className="text-[10px] text-gray-600 my-0.5">{data?.tenantDesc ?? "SÍNODO / PRESBITÉRIO"}</p>
             <p className="text-base mt-1">{data?.tenantName}</p>
@@ -147,7 +199,7 @@ export default function BalancetePage() {
             <p>BALANCETE POR CONTA DE {new Date(startDate ?? "").toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
         </div>
 
-        {/* RECEITAS [cite: 34, 35] */}
+        {/* RECEITAS */}
         <div className="mb-4">
             <h3 className="font-bold border-b border-gray-400 mb-1">RECEITAS</h3>
             <table className="w-full border-collapse">
@@ -174,7 +226,7 @@ export default function BalancetePage() {
             </table>
         </div>
 
-        {/* DESPESAS [cite: 38, 39] */}
+        {/* DESPESAS */}
         <div className="mb-4">
             <h3 className="font-bold border-b border-gray-400 mb-1">DESPESAS</h3>
             <table className="w-full border-collapse">
@@ -201,7 +253,7 @@ export default function BalancetePage() {
             </table>
         </div>
 
-        {/* RESUMO [cite: 43] */}
+        {/* RESUMO */}
         <div className="flex justify-end mt-6">
             <div className="w-1/2 border-t-2 border-black pt-1">
                 <div className="flex justify-between py-0.5">
@@ -221,7 +273,7 @@ export default function BalancetePage() {
             </div>
         </div>
 
-        {/* ASSINATURAS [cite: 45] */}
+        {/* ASSINATURAS */}
         <div className="mt-16 grid grid-cols-2 gap-12 text-center break-inside-avoid">
             <div>
                 <div className="border-t border-black pt-2 mx-8">

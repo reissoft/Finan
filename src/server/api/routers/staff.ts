@@ -96,8 +96,15 @@ export const staffRouter = createTRPCRouter({
       targetDate: z.date(), // Data de referência (ex: dia de hoje)
     }))
     .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id },include: { tenant: true } });
       if (!user?.tenantId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+      if (user?.tenant?.plan === "FREE") {
+         throw new TRPCError({
+           code: "FORBIDDEN",
+           message: "A geração automática de folha é exclusiva do plano PRO."
+         });
+       }
 
       // 1. Busca o Funcionário
       const staff = await ctx.db.staff.findUnique({

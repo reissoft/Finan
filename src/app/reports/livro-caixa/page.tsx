@@ -15,10 +15,17 @@ export default function LivroCaixaPage() {
   const [signerName, setSignerName] = useState("");
   const [signerRole, setSignerRole] = useState("TESOUREIRO(A)");
 
-  const { data, refetch, isFetching } = api.reports.getCashBook.useQuery({
-    startDate: new Date(startDate ?? ""),
-    endDate: new Date(endDate ?? ""),
-  });
+  // --- MUDANÇA 1: Capturando erro e desligando retry ---
+  const { data, refetch, isFetching, isError, error } = api.reports.getCashBook.useQuery(
+    {
+        startDate: new Date(startDate ?? ""),
+        endDate: new Date(endDate ?? ""),
+    },
+    {
+        retry: false, // Importante: Não tenta de novo se for erro de permissão
+        refetchOnWindowFocus: false,
+    }
+  );
 
   useEffect(() => {
     if (data?.treasurerName) setSignerName(data.treasurerName);
@@ -28,6 +35,59 @@ export default function LivroCaixaPage() {
   const fmt = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR');
 
+  // =========================================================
+  // MUDANÇA 2: Renderização Condicional da Tela de Bloqueio
+  // =========================================================
+  if (isError) {
+    // Verifica se é o erro de plano (FORBIDDEN ou PLAN_LIMIT_REACHED)
+    const isPlanError = error.data?.code === "FORBIDDEN" || error.message.includes("PLAN_LIMIT_REACHED");
+
+    return (
+        <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
+            {/* Mantemos o menu superior para o usuário poder voltar */}
+            <div className="w-full max-w-[210mm] bg-white p-4 rounded-lg shadow mb-8 flex flex-wrap gap-4 items-center border-l-4 border-gray-400">
+                <div className="w-full flex justify-between">
+                    <h1 className="font-bold text-xl text-gray-500">Relatório Bloqueado</h1>
+                    <Link href="/reports" className="text-gray-500 hover:text-green-600 font-bold text-sm">← Voltar aos Relatórios</Link>
+                </div>
+            </div>
+
+            {/* A TELA DE BLOQUEIO */}
+            <div className="flex flex-col items-center justify-center bg-white p-12 rounded-lg shadow-xl text-center max-w-lg mt-10">
+                <div className="text-6xl mb-6">
+                    {isPlanError ? "🔒" : "⚠️"}
+                </div>
+                
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                    {isPlanError ? "Funcionalidade Exclusiva PRO" : "Erro ao carregar"}
+                </h2>
+                
+                <p className="text-gray-600 mb-8 leading-relaxed">
+                    {isPlanError 
+                        ? "O Livro Caixa detalhado é um recurso exclusivo do plano PRO. O plano Grátis oferece apenas o Resumo Financeiro. Faça o upgrade para acessar."
+                        : `Ocorreu um erro técnico: ${error.message}`
+                    }
+                </p>
+
+                {isPlanError && (
+                    <button className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
+                        ⭐ Quero ser PRO
+                    </button>
+                )}
+                
+                {!isPlanError && (
+                    <button onClick={() => refetch()} className="bg-gray-200 text-gray-800 px-6 py-2 rounded hover:bg-gray-300">
+                        Tentar Novamente
+                    </button>
+                )}
+            </div>
+        </main>
+    );
+  }
+
+  // =========================================================
+  // SE NÃO TIVER ERRO, RENDERIZA O RELATÓRIO NORMALMENTE
+  // =========================================================
   return (
     <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center print:bg-white print:p-0">
       

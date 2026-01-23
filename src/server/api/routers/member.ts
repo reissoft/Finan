@@ -25,8 +25,22 @@ export const memberRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id },include: { tenant: true } });
       if (!user?.tenantId) throw new Error("Usuário sem organização");
+
+
+
+      // --- BLOQUEIO PLANO FREE: MÁXIMO 50 MEMBROS ---
+      if (user.tenant.plan === "FREE") {
+        const count = await ctx.db.member.count({
+          where: { tenantId: user.tenantId }
+        });
+
+        if (count >= 50) {
+          throw new Error("Limite do Plano Grátis atingido (50 membros). Faça o Upgrade para cadastrar mais.");
+        }
+      }
+      // ----------------------------------------------
 
       return ctx.db.member.create({
         data: {

@@ -1,5 +1,6 @@
 import { auth } from "~/server/auth";
 import { api } from "~/trpc/server";
+import { db } from "~/server/db"; // <--- 1. IMPORTANTE: Importar o banco
 import { CreateTransaction } from "./_components/create-transaction";
 import { TransactionItem } from "./_components/transaction-item";
 import { AuthForm } from "./_components/auth-form";
@@ -7,7 +8,6 @@ import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 import { SignOutButton } from "./_components/sign-out-button";
 
-// 1. MUDANÇA NO TIPO (Adicionamos Promise<...>)
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -27,25 +27,23 @@ export default async function Home({ searchParams }: Props) {
     );
   }
 
-  // 2. MUDANÇA NA LEITURA (Precisamos do await)
+  // --- 2. BUSCA O PLANO ATUAL DO USUÁRIO ---
+  const userFull = await db.user.findUnique({
+    where: { id: session.user.id },
+    include: { tenant: true }
+  });
+  const currentPlan = userFull?.tenant?.plan ?? "FREE";
+  // ------------------------------------------
+
   const params = await searchParams;
   const now = new Date();
 
-  // 1. Tenta converter o mês para número
   const rawMonth = Number(params?.month);
-  // 2. Se for NaN (inválido) ou 0, usa o mês atual
   const month = !rawMonth && isNaN(rawMonth) ? now.getMonth() + 1 : rawMonth;
 
-  // 1. Tenta converter o ano
   const rawYear = Number(params?.year);
-  // 2. Se for NaN (inválido) ou 0, usa o ano atual
   const year = !rawYear && isNaN(rawYear) ? now.getFullYear() : rawYear;
-  // ---------------------
-  // Agora usamos a variável "params" que já foi carregada
-  //const month = Number(params?.month) && new Date().getMonth() + 1;
-  //const year = Number(params?.year) && new Date().getFullYear();
 
-  // O resto continua igual...
   const transactions = await api.transaction.getAll({ month, year });
   const stats = await api.transaction.getDashboardStats({ month, year });
 
@@ -54,57 +52,79 @@ export default async function Home({ searchParams }: Props) {
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
 
-        
-
         <div className="flex items-center gap-4">
           
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-gray-700">{session.user?.name}</p>
+          {/* --- 3. EXIBIÇÃO DO NOME E PLANO --- */}
+          <div className="text-right hidden sm:flex flex-col items-end">
+            <p className="text-sm font-bold text-gray-700 leading-tight">
+                {session.user?.name}
+            </p>
+            
+            <div className="mt-1">
+                {currentPlan === "FREE" ? (
+                    <div className="flex items-center gap-2">
+                        <span className="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-gray-300">
+                            Free
+                        </span>
+                        <Link 
+                            href="/settings" // Link para sua página de planos/config
+                            className="text-[10px] text-blue-600 font-bold hover:underline hover:text-blue-800 transition-colors flex items-center gap-0.5"
+                        >
+                            Fazer Upgrade 🚀
+                        </Link>
+                    </div>
+                ) : (
+                    <span className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shadow-sm border border-yellow-500">
+                        ⭐ PRO
+                    </span>
+                )}
+            </div>
           </div>
+          {/* ----------------------------------- */}
+
           <SignOutButton />
         </div>
-
-        
-        
       </div>
       
-<div className="w-full max-w-4xl space-y-6">
-        <div className="grid grid-cols-3 gap-4"></div>
-
-<Link
-            href="/members"
-            className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm"
-          >
-            👥 Membros
-          </Link>
-          <Link href="/settings" className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm">
-            ⚙️ Configurações
-          </Link>
-          <Link 
-  href="/reports" 
-  className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full font-bold hover:bg-purple-200 transition text-sm"
->
-  📊 Relatórios
-</Link>
-<Link 
-  href="/staff" 
-  className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-bold hover:bg-orange-200 transition text-sm"
->
-  👔 Equipe
-</Link>
-<Link 
-  href="/payables" 
-  className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition text-sm"
->
-  💸 Contas a Pagar
-</Link>
-
-</div>
-<br></br>
-<MonthSelector />
-<br></br>
       <div className="w-full max-w-4xl space-y-6">
-        <div className="grid grid-cols-3 gap-4">
+        {/* BOTÕES DE NAVEGAÇÃO */}
+        <div className="flex flex-wrap gap-3">
+            <Link
+                href="/members"
+                className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm flex items-center gap-2"
+            >
+                👥 Membros
+            </Link>
+            <Link 
+                href="/settings" 
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm flex items-center gap-2"
+            >
+                ⚙️ Configurações
+            </Link>
+            <Link 
+                href="/reports" 
+                className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full font-bold hover:bg-purple-200 transition text-sm flex items-center gap-2"
+            >
+                📊 Relatórios
+            </Link>
+            <Link 
+                href="/staff" 
+                className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-bold hover:bg-orange-200 transition text-sm flex items-center gap-2"
+            >
+                👔 Equipe
+            </Link>
+            <Link 
+                href="/payables" 
+                className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition text-sm flex items-center gap-2"
+            >
+                💸 Contas a Pagar
+            </Link>
+        </div>
+
+        <MonthSelector />
+        
+        {/* CARDS DE RESUMO */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
             <p className="text-gray-500 text-sm">Entradas ({month}/{year})</p>
             <p className="text-2xl font-bold text-green-600">R$ {stats.income.toFixed(2)}</p>
@@ -123,10 +143,13 @@ export default async function Home({ searchParams }: Props) {
 
         <CreateTransaction />
 
+        {/* LISTA DE TRANSAÇÕES */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2 flex justify-between">
+          <h2 className="text-2xl font-semibold mb-4 border-b pb-2 flex justify-between items-center">
             <span>Lançamentos</span>
-            <span className="text-sm text-gray-400 font-normal">Mostrando {transactions.length} itens</span>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
+                {transactions.length} itens
+            </span>
           </h2>
           <div className="space-y-4">
             {transactions.length === 0 ? (

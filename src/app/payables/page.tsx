@@ -31,6 +31,13 @@ export default function PayablesPage() {
     onSuccess: () => {
       void refetchPayables();
       setDesc(""); setAmount(""); setDueDate(""); setCatId("");
+    },onError: (error) => {
+      // Verifica se a mensagem contém "Limite" ou se o código é FORBIDDEN
+      if (error.data?.code === "FORBIDDEN" || error.message.includes("Limite")) {
+        alert("🔒 " + error.message);
+      } else {
+        alert("Erro ao salvar: " + error.message);
+      }
     }
   });
 
@@ -49,7 +56,8 @@ export default function PayablesPage() {
       void refetchPayables();
       setPayModalOpen(false);
       alert("Conta paga e lançada no caixa com sucesso!");
-    }
+    },
+    onError: (e) => alert(e.message)
   });
 
   const deleteMutation = api.payables.delete.useMutation({
@@ -67,7 +75,7 @@ export default function PayablesPage() {
         amount: parseFloat(amount),
         dueDate: new Date(dueDate),
         categoryId: catId
-    });
+    },);
   };
 
   const handleCreateCat = () => {

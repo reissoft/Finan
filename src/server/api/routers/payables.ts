@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
@@ -26,8 +27,47 @@ export const payablesRouter = createTRPCRouter({
       categoryId: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id },include: { tenant: true } });
       if (!user?.tenantId) throw new Error("Sem organização");
+
+
+      // --- TRAVA: PLANO FREE (MÁX 50 CONTAS NO MÊS DE VENCIMENTO) ---
+      if (user.tenant?.plan === "FREE") {
+        // Calcula o intervalo do mês baseado na Data de Vencimento
+        // 1. Extrai Ano e Mês em UTC (Para não cair no dia anterior/mês anterior)
+        const year = input.dueDate.getUTCFullYear();
+        const month = input.dueDate.getUTCMonth(); // 0 = Jan, 11 = Dez
+
+        // 2. Cria o intervalo forçando UTC (Date.UTC)
+        // Inicio: Dia 1, 00:00:00
+        const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+        
+        // Fim: Dia 0 do próximo mês (último dia do mês atual), 23:59:59
+        const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59));
+
+
+        const count = await ctx.db.accountPayable.count({
+          where: {
+            tenantId: user.tenantId,
+            dueDate: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            },
+          },
+        });
+
+
+      console.log("----------------------");
+
+        if (count >= 30) {
+            const msge = `Limite do Plano Grátis atingido! Você só pode agendar 30 contas para este mês. (Atual: ${count})`;
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: msge
+          });
+        }
+      }
+      // ----------------------------------------------------------------
 
       return ctx.db.accountPayable.create({
         data: {
@@ -52,6 +92,8 @@ export const payablesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
+
+      
 
       // Usamos Transaction ($transaction) para garantir que ou faz tudo ou não faz nada
       return ctx.db.$transaction(async (prisma) => {

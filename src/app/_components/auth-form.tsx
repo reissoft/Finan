@@ -38,8 +38,34 @@ export function AuthForm() {
         password,
       });
 
+
       if (result?.error) {
-        alert("Erro: " + result.error);
+          let msg = "";
+          
+          // Agora o result.error vai conter o "code" que definimos no config.ts
+          // ou "CredentialsSignin" dependendo da versão exata do beta
+          
+          // Vamos verificar o erro retornado
+          switch (result.code) {
+            case "EMAIL_NOT_VERIFIED":
+              msg = "Por favor, acesse seu e-mail e confirme sua conta antes de entrar.";
+              break;
+            case "INVALID_CREDENTIALS":
+              msg = "E-mail ou senha incorretos.";
+              break;
+            case "Configuration":
+              // Se ainda der Configuration, é algo inesperado
+              msg = "Erro interno no servidor.";
+              break;
+            default:
+              // Às vezes o NextAuth v5 manda o erro como "CredentialsSignin"
+              // Se você inspecionar o objeto result, o 'code' pode estar lá dentro
+              msg = "Erro ao fazer login. Verifique seus dados.";
+          }
+
+     // if (result?.error) {
+        console.log(result);
+        alert("Erro: " + msg);
         setLoading(false);
       } else {
         router.refresh(); // Recarrega a página para o servidor liberar o acesso

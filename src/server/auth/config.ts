@@ -3,16 +3,23 @@ import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { db } from "~/server/db";
+// 1. IMPORTANTE: Importe a classe base de erro
+import { CredentialsSignin } from "next-auth";
+
+// 2. Crie classes para seus erros personalizados
+class InvalidLoginError extends CredentialsSignin {
+  code = "INVALID_CREDENTIALS"; // Esse código vai chegar no frontend
+}
+
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = "EMAIL_NOT_VERIFIED"; // Esse código vai chegar no frontend
+}
 
 /**
- * Module augmentation for `next-auth` types.
+ * Module augmentation... (seu código continua igual aqui)
  */
 declare module "next-auth" {
-  interface Session extends DefaultSession {
-    user: {
-      id: string;
-    } & DefaultSession["user"];
-  }
+  // ...
 }
 
 export const authConfig: NextAuthConfig = {
@@ -24,7 +31,6 @@ export const authConfig: NextAuthConfig = {
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        // Validação 1: Entrada de dados
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
@@ -33,16 +39,21 @@ export const authConfig: NextAuthConfig = {
           where: { email: credentials.email as string },
         });
 
-        // --- CORREÇÃO AQUI (Linha 44) ---
-        // Em vez de (!user || !user.password), usamos apenas !user?.password
         if (!user?.password) {
-          throw new Error("Usuário não encontrado.");
+          // 3. USE A CLASSE PERSONALIZADA
+          throw new InvalidLoginError();
         }
 
         const isValid = await compare(credentials.password as string, user.password);
 
         if (!isValid) {
-          throw new Error("Senha incorreta.");
+          // 3. USE A CLASSE PERSONALIZADA
+          throw new InvalidLoginError();
+        }
+
+        if (!user.emailVerified) {
+          // 3. AQUI ESTÁ A MÁGICA: USE A CLASSE ESPECÍFICA
+          throw new EmailNotVerifiedError();
         }
 
         return {
@@ -56,6 +67,7 @@ export const authConfig: NextAuthConfig = {
   ],
   adapter: PrismaAdapter(db),
   callbacks: {
+    // ... seus callbacks continuam iguais
     session: ({ session, token }) => ({
       ...session,
       user: {

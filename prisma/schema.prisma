@@ -63,6 +63,8 @@ model User {
     tenantId      String?   
     tenant        Tenant?   @relation(fields: [tenantId], references: [id])
 
+    verifyToken   String?   // O código secreto para validar
+
     // Tabelas padrão do NextAuth (para login com Google/Github se precisar)
     accounts      NextAuthAccount[]
     sessions      Session[]

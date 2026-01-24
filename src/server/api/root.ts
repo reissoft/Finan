@@ -6,6 +6,7 @@ import { settingsRouter } from "./routers/settings";
 import { reportsRouter } from "./routers/reports";
 import { staffRouter } from "./routers/staff";
 import { payablesRouter } from "./routers/payables";
+import { stripeRouter } from "./routers/stripe";
 
 /**
  * This is the primary router for your server.
@@ -20,6 +21,7 @@ export const appRouter = createTRPCRouter({
   reports: reportsRouter,
   staff: staffRouter,
   payables: payablesRouter,
+  stripe: stripeRouter,
 });
 
 // export type definition of API

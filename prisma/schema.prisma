@@ -31,6 +31,12 @@ model Tenant {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
+    // NOVOS CAMPOS PARA O STRIPE
+  stripeCustomerId       String?   @unique // ID do cliente no Stripe
+  stripeSubscriptionId   String?   @unique // ID da assinatura atual
+  stripePriceId          String?             // Qual plano ele assinou
+  stripeCurrentPeriodEnd DateTime?           // Quando a assinatura vence
+
     users        User[]
     members      Member[]
     categories   Category[]

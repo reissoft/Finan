@@ -2,15 +2,13 @@ import { headers } from "next/headers";
 import { db } from "~/server/db";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: Request) {
   console.log("📥 WEBHOOK: Recebido!"); // <--- Log 1
 
   const body = await req.text();
-  const signature = headers().get("Stripe-Signature") as string;
+  const signature = (await headers()).get("Stripe-Signature") as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   console.log("🔑 Segredo usado:", webhookSecret?.slice(0, 10) + "..."); // <--- Log 2
@@ -55,7 +53,8 @@ export async function POST(req: Request) {
                     stripeSubscriptionId: subscription.id,
                     stripeCustomerId: subscription.customer as string,
                     stripePriceId: subscription.items.data[0]?.price.id,
-                    stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                    // Adicionamos "as any" para forçar o TypeScript a aceitar
+                    stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
                 },
             });
             console.log("✨ SUCESSO! Plano alterado para PRO.");

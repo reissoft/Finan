@@ -2,9 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16", // Use a versão mais recente sugerida
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export const stripeRouter = createTRPCRouter({
   createCheckoutSession: protectedProcedure

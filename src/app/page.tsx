@@ -15,7 +15,7 @@ type Props = {
 export default async function Home({ searchParams }: Props) {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
         <div className="mb-8 text-center">

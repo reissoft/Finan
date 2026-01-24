@@ -31,7 +31,7 @@ export const memberRouter = createTRPCRouter({
 
 
       // --- BLOQUEIO PLANO FREE: MÁXIMO 50 MEMBROS ---
-      if (user.tenant.plan === "FREE") {
+      if (user.tenant?.plan === "FREE") {
         const count = await ctx.db.member.count({
           where: { tenantId: user.tenantId }
         });

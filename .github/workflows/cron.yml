@@ -11,5 +11,5 @@ jobs:
     steps:
       - name: Chamar API do Sistema
         run: |
-          curl -X GET ${{ secrets.PROD_URL }}/api/cron/notify-payables \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          curl -X GET https://finan-production.up.railway.app/api/cron/notify-payables \
+          -H "Authorization: Bearer Jesus_Te_Ama_2026"

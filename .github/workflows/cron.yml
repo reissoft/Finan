@@ -1,0 +1,15 @@
+name: Notificar Contas a Pagar
+on:
+  schedule:
+    # Roda todo dia às 08:00 AM (Horário UTC - ajuste conforme necessário)
+    - cron: '0 11 * * *' 
+  workflow_dispatch: # Permite rodar manualmente clicando num botão
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar API do Sistema
+        run: |
+          curl -X GET ${{ secrets.PROD_URL }}/api/cron/notify-payables \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

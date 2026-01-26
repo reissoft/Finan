@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   console.log("📥 WEBHOOK: Recebido!"); // <--- Log 1
 
   const body = await req.text();
-  const signature = (await headers()).get("Stripe-Signature") as string;
+ const signature = (await headers()).get("Stripe-Signature")!;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   console.log("🔑 Segredo usado:", webhookSecret?.slice(0, 10) + "..."); // <--- Log 2
@@ -24,9 +24,9 @@ export async function POST(req: Request) {
       webhookSecret
     );
     console.log("✅ Assinatura Válida! Evento:", event.type); // <--- Log 3
-  } catch (error: any) {
-    console.error("❌ Erro de Assinatura:", error.message);
-    return new Response(`Webhook Error: ${error.message}`, { status: 400 });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return new Response(`Webhook Error: ${errorMessage}`, { status: 400 });
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
@@ -36,12 +36,11 @@ export async function POST(req: Request) {
     console.log("Metadata recebido:", session.metadata);
 
     // Recupera a assinatura completa para pegar as datas
-    const subscriptionId = typeof session.subscription === 'string' 
-        ? session.subscription 
-        : session.subscription?.id;
+    const subscriptionId = session.subscription as string;
+    const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
     if (subscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        //const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         
         if (session?.metadata?.tenantId) {
             console.log("🔄 Atualizando Banco de Dados para Tenant:", session.metadata.tenantId);
@@ -54,6 +53,8 @@ export async function POST(req: Request) {
                     stripeCustomerId: subscription.customer as string,
                     stripePriceId: subscription.items.data[0]?.price.id,
                     // Adicionamos "as any" para forçar o TypeScript a aceitar
+                    //stripeCurrentPeriodEnd: new Date((subscription as Stripe.Subscription).current_period_end * 1000),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                     stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
                 },
             });

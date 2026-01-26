@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. Configura a Data (Fuso Horário pode influenciar)
-  const now = new Date();
+  //const now = new Date();
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 /*
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 
     // Tenta enviar para cada usuário
     for (const user of tenant.users) {
-      console.log(`   👤 Verificando usuário: ${user.name || user.email}`);
+      console.log(`   👤 Verificando usuário: ${user.name ?? user.email}`);
       
       if (!user.phoneNumber) {
         console.log("      ⚠️ PULADO: Usuário sem 'phoneNumber' no banco.");

@@ -8,7 +8,7 @@ import crypto from "crypto"; // Para gerar o token aleatório
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Define a URL do seu site (ajuste conforme necessário, ex: localhost:3000 ou seu dominio)
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://finan-production.up.railway.app/";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://finan-production.up.railway.app/";
 
 export const authRouter = createTRPCRouter({
   

@@ -1,9 +1,10 @@
+
 "use client";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { api } from "~/trpc/react";
 
-export default function VerifyPage() {
+function VerifyContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const router = useRouter();
@@ -31,5 +32,13 @@ export default function VerifyPage() {
     <div className="h-screen flex items-center justify-center">
       <h1 className="text-xl font-bold">{status}</h1>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <VerifyContent />
+    </Suspense>
   );
 }

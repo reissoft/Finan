@@ -8,17 +8,17 @@ export async function GET(req: NextRequest) {
   // 1. Verificação de Segurança
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    //return new Response("Unauthorized", { status: 401 });
+    return new Response("Unauthorized", { status: 401 });
   }
 
   // 2. Configura a Data (Fuso Horário pode influenciar)
   const now = new Date();
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
-
+/*
   console.log("🔍 --- INICIANDO DEBUG DO CRON ---");
   console.log(`📅 Data Servidor: ${now.toISOString()}`);
-  console.log(`📅 Filtrando contas com vencimento até: ${todayEnd.toISOString()}`);
+  console.log(`📅 Filtrando contas com vencimento até: ${todayEnd.toISOString()}`);*/
 
   // 3. Busca Tenants (Igrejas) que têm contas pendentes
   const tenantsWithPayables = await db.tenant.findMany({
@@ -41,15 +41,15 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  console.log(`🏢 Igrejas encontradas com contas pendentes: ${tenantsWithPayables.length}`);
+  //console.log(`🏢 Igrejas encontradas com contas pendentes: ${tenantsWithPayables.length}`);
 
   const results = [];
 
   // 4. Loop para detalhar o que está acontecendo
   for (const tenant of tenantsWithPayables) {
-    console.log(`\n➡️ Analisando Igreja: ${tenant.name}`);
-    console.log(`   💰 Contas Vencidas/Hoje: ${tenant.accountPayables.length}`);
-    console.log(`   👥 Usuários cadastrados na equipe: ${tenant.users.length}`);
+  //  console.log(`\n➡️ Analisando Igreja: ${tenant.name}`);
+   // console.log(`   💰 Contas Vencidas/Hoje: ${tenant.accountPayables.length}`);
+   // console.log(`   👥 Usuários cadastrados na equipe: ${tenant.users.length}`);
 
     if (tenant.users.length === 0) {
       console.log("   ❌ AVISO: Nenhum usuário vinculado a esta igreja (tenantId). Ninguém vai receber.");
@@ -61,13 +61,13 @@ export async function GET(req: NextRequest) {
     const count = tenant.accountPayables.length;
 
     let message = `🔔 *Alerta Finan Igreja* 🔔\n\n`;
-    message += `Olá! Existem *${count} contas* a pagar vencendo hoje ou atrasadas na *${tenant.name}*.\n\n`;
+    message += `Olá! Existem *${count} contas* a pagar vencendo hoje ou atrasadas na *${tenant.name.trim()}*.\n\n`;
     tenant.accountPayables.slice(0, 3).forEach(p => {
         message += `• ${p.description}: ${formatMoney(Number(p.amount))}\n`;
     });
     if (count > 3) message += `... e mais ${count - 3} contas.\n`;
     message += `\n💰 *Total:* ${formatMoney(totalValue)}`;
-    message += `\n🔗 Acesse: https://finan-igreja.vercel.app/payables`;
+    message += `\n🔗 Acesse: https://finan-production.up.railway.app/payables`;
 
     // Tenta enviar para cada usuário
     for (const user of tenant.users) {

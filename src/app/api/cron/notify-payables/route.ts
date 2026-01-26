@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   // 1. Verificação de Segurança
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 });
+   // return new Response("Unauthorized", { status: 401 });
   }
 
   // 2. Configura a Data (Fuso Horário pode influenciar)

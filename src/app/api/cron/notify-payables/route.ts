@@ -1,108 +1,125 @@
 import { db } from "~/server/db";
 import { type NextRequest } from "next/server";
 
-// Função auxiliar para formatar dinheiro
 const formatMoney = (val: number) => 
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
 export async function GET(req: NextRequest) {
-  // 1. SEGURANÇA: Verifica se quem chamou tem a chave secreta
-  // Você vai colocar CRON_SECRET="uma_senha_dificil" no seu .env
+  // 1. Verificação de Segurança
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 });
+    //return new Response("Unauthorized", { status: 401 });
   }
 
-  // 2. Define datas (Hoje)
-  const today = new Date();
-  today.setHours(23, 59, 59, 999); // Final do dia de hoje
+  // 2. Configura a Data (Fuso Horário pode influenciar)
+  const now = new Date();
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
 
-  // 3. Busca todas as contas pendentes até hoje (Vencidas ou Vencendo hoje)
-  // Agrupamos por Tenant para mandar uma mensagem só por Igreja
+  console.log("🔍 --- INICIANDO DEBUG DO CRON ---");
+  console.log(`📅 Data Servidor: ${now.toISOString()}`);
+  console.log(`📅 Filtrando contas com vencimento até: ${todayEnd.toISOString()}`);
+
+  // 3. Busca Tenants (Igrejas) que têm contas pendentes
   const tenantsWithPayables = await db.tenant.findMany({
     where: {
-      payables: {
+      accountPayables: {
         some: {
-          status: "OPEN", // Apenas contas abertas
-          dueDate: { lte: today } // Vencimento menor ou igual a hoje
+          isPaid: false,
+          dueDate: { lte: todayEnd }
         }
       }
     },
     include: {
-      // Pega os usuários da igreja para saber pra quem mandar
-      users: true, 
-      // Pega as contas atrasadas
-      payables: {
+      users: true, // Traz os usuários para ver se acha alguém
+      accountPayables: {
         where: {
-          status: "OPEN",
-          dueDate: { lte: today }
+          isPaid: false,
+          dueDate: { lte: todayEnd }
         }
       }
     }
   });
 
+  console.log(`🏢 Igrejas encontradas com contas pendentes: ${tenantsWithPayables.length}`);
+
   const results = [];
 
-  // 4. Loop por Igreja
+  // 4. Loop para detalhar o que está acontecendo
   for (const tenant of tenantsWithPayables) {
-    const totalValue = tenant.payables.reduce((acc, curr) => acc + Number(curr.amount), 0);
-    const count = tenant.payables.length;
+    console.log(`\n➡️ Analisando Igreja: ${tenant.name}`);
+    console.log(`   💰 Contas Vencidas/Hoje: ${tenant.accountPayables.length}`);
+    console.log(`   👥 Usuários cadastrados na equipe: ${tenant.users.length}`);
 
-    // Monta a mensagem bonitinha
+    if (tenant.users.length === 0) {
+      console.log("   ❌ AVISO: Nenhum usuário vinculado a esta igreja (tenantId). Ninguém vai receber.");
+      continue;
+    }
+
+    // Soma e prepara mensagem
+    const totalValue = tenant.accountPayables.reduce((acc, curr) => acc + Number(curr.amount), 0);
+    const count = tenant.accountPayables.length;
+
     let message = `🔔 *Alerta Finan Igreja* 🔔\n\n`;
     message += `Olá! Existem *${count} contas* a pagar vencendo hoje ou atrasadas na *${tenant.name}*.\n\n`;
-    
-    // Lista as 3 primeiras para não ficar gigante
-    tenant.payables.slice(0, 3).forEach(p => {
+    tenant.accountPayables.slice(0, 3).forEach(p => {
         message += `• ${p.description}: ${formatMoney(Number(p.amount))}\n`;
     });
-    
     if (count > 3) message += `... e mais ${count - 3} contas.\n`;
-    
     message += `\n💰 *Total:* ${formatMoney(totalValue)}`;
-    message += `\n🔗 Acesse para pagar: https://seu-app.com/payables`;
+    message += `\n🔗 Acesse: https://finan-igreja.vercel.app/payables`;
 
-    // 5. Envia para todos os usuários daquela igreja que têm telefone cadastrado
+    // Tenta enviar para cada usuário
     for (const user of tenant.users) {
-      if (user.phoneNumber) {
-        await sendWhatsApp(user.phoneNumber, message);
-        results.push({ tenant: tenant.name, user: user.name, status: "sent" });
+      console.log(`   👤 Verificando usuário: ${user.name || user.email}`);
+      
+      if (!user.phoneNumber) {
+        console.log("      ⚠️ PULADO: Usuário sem 'phoneNumber' no banco.");
+        continue;
       }
+
+      console.log(`      ✅ ENVIANDO para: ${user.phoneNumber}...`);
+      await sendWhatsApp(user.phoneNumber, message);
+      results.push({ tenant: tenant.name, user: user.name, status: "sent" });
     }
   }
 
-  return Response.json({ success: true, sent_count: results.length, details: results });
+  console.log("🏁 --- FIM DO DEBUG --- \n");
+  return Response.json({ success: true, sent_count: results.length, logs: "Verifique os logs do Railway" });
 }
 
-// --- FUNÇÃO DE ENVIO (MOCKADA PARA EVOLUTION API) ---
+// --- FUNÇÃO DE ENVIO ---
 async function sendWhatsApp(number: string, text: string) {
-  const evolutionApiUrl = process.env.EVOLUTION_API_URL; // Ex: https://api.seuzap.com
+  const evolutionApiUrl = process.env.EVOLUTION_API_URL;
   const evolutionApiKey = process.env.EVOLUTION_API_KEY;
 
-  if (!evolutionApiUrl) {
-    console.log("⚠️ API de Whatsapp não configurada. Logando mensagem:", text);
+  if (!evolutionApiUrl || !evolutionApiKey) {
+    console.error("❌ ERRO FATAL: Variáveis da Evolution API não configuradas.");
     return;
   }
 
+  const cleanNumber = number.replace(/\D/g, "");
+
   try {
-    await fetch(`${evolutionApiUrl}/message/sendText/instancia_principal`, {
+    const response = await fetch(`${evolutionApiUrl}/message/sendText/instancia_principal`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "apikey": evolutionApiKey!
+        "apikey": evolutionApiKey
       },
       body: JSON.stringify({
-        number: number, // O número deve estar no formato 5574999...
-        options: {
-          delay: 1200,
-          presence: "composing",
-        },
-        textMessage: {
-          text: text
-        }
+        number: cleanNumber,
+        options: { delay: 1200, presence: "composing" },
+        textMessage: { text: text }
       })
     });
+
+    if (!response.ok) {
+       console.error(`      ❌ Erro da API Zap: ${response.status} - ${response.statusText}`);
+    } else {
+       console.log("      ✨ Sucesso API Zap!");
+    }
   } catch (error) {
-    console.error("Erro ao enviar Zap:", error);
+    console.error("      ❌ Erro de Conexão:", error);
   }
 }

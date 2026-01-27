@@ -5,6 +5,7 @@ import { analyzeMessage } from "~/lib/ai";
 // Isso ensina ao TypeScript o que esperar do Evolution API
 interface EvolutionWebhookBody {
   event: string;
+  sender?: string;
   data: {
     key: {
       remoteJid: string;
@@ -38,10 +39,10 @@ export async function POST(req: Request) {
     }
 
     // IDENTIFICAR O USUÁRIO
-    const rawPhone = messageData.key.remoteJid; 
+    const rawPhone = body.sender ?? messageData.key.remoteJid;
     // Agora o replace funciona porque rawPhone é string garantida pela interface
-    const phone = rawPhone.replace("@s.whatsapp.net", "");
-
+    const phone = rawPhone.replace("@s.whatsapp.net", "").replace("@lid", "");
+    console.log(`📱 Telefone detectado: ${phone}`);
     // Busca usuário no banco
     const user = await db.user.findFirst({
       where: { phoneNumber: phone },

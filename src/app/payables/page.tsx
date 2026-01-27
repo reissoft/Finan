@@ -11,7 +11,7 @@ export default function PayablesPage() {
   const [dueDate, setDueDate] = useState("");
   const [catId, setCatId] = useState("");
 
-  // STATES PARA NOVA CATEGORIA (IGUAL CARGOS)
+  // STATES PARA NOVA CATEGORIA
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
@@ -22,17 +22,19 @@ export default function PayablesPage() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
 
   // QUERIES
-  // Renomeamos refetch para não dar conflito
   const { data: payables, refetch: refetchPayables } = api.payables.getAll.useQuery();
   const { data: settings, refetch: refetchSettings } = api.settings.getAll.useQuery(); 
+  
+  // NOVO: Verifica o perfil para mostrar o aviso do WhatsApp
+  const { data: userProfile } = api.settings.getProfile.useQuery();
 
   // MUTATIONS
   const createMutation = api.payables.create.useMutation({
     onSuccess: () => {
       void refetchPayables();
       setDesc(""); setAmount(""); setDueDate(""); setCatId("");
-    },onError: (error) => {
-      // Verifica se a mensagem contém "Limite" ou se o código é FORBIDDEN
+    },
+    onError: (error) => {
       if (error.data?.code === "FORBIDDEN" || error.message.includes("Limite")) {
         alert("🔒 " + error.message);
       } else {
@@ -41,11 +43,10 @@ export default function PayablesPage() {
     }
   });
 
-  // Mutation para criar Categoria na hora (Forçando tipo SAÍDA/EXPENSE)
   const createCatMutation = api.settings.createCategory.useMutation({
       onSuccess: (data) => {
-          void refetchSettings(); // Atualiza a lista
-          setCatId(data.id);      // Já seleciona a nova
+          void refetchSettings();
+          setCatId(data.id);
           setIsCreatingCat(false);
           setNewCatName("");
       }
@@ -75,12 +76,11 @@ export default function PayablesPage() {
         amount: parseFloat(amount),
         dueDate: new Date(dueDate),
         categoryId: catId
-    },);
+    });
   };
 
   const handleCreateCat = () => {
       if(!newCatName) return;
-      // Cria sempre como "EXPENSE" (Saída) pois estamos no Contas a Pagar
       createCatMutation.mutate({ name: newCatName, type: "EXPENSE" });
   }
 
@@ -95,7 +95,6 @@ export default function PayablesPage() {
       });
   }
 
-  // AUXILIAR
   const isLate = (date: Date) => {
       const today = new Date();
       today.setHours(0,0,0,0);
@@ -106,10 +105,27 @@ export default function PayablesPage() {
     <main className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-5xl">
         
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-red-900">Contas a Pagar 💸</h1>
             <Link href="/" className="text-gray-600 hover:text-red-600 font-bold">← Voltar</Link>
         </div>
+
+        {/* --- NOVO: AVISO DO WHATSAPP --- */}
+        {/* Só mostra se o perfil carregou E (não tem telefone OU alertas estão desligados) */}
+        {userProfile && (!userProfile.phoneNumber || !userProfile.receiveWhatsappAlerts) && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r shadow-sm flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    <span className="text-2xl">🔔</span>
+                    <div>
+                        <p className="font-bold text-yellow-800 text-sm">Receba lembretes no seu WhatsApp!</p>
+                        <p className="text-yellow-700 text-xs">Evite atrasos recebendo avisos automáticos das contas vencendo no dia.</p>
+                    </div>
+                </div>
+                <Link href="/settings" className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded text-xs font-bold hover:bg-yellow-200 transition">
+                    CONFIGURAR AGORA →
+                </Link>
+            </div>
+        )}
 
         {/* --- FORMULÁRIO DE CADASTRO --- */}
         <div className="bg-white p-6 rounded-lg shadow-md mb-8 border-t-4 border-red-500">
@@ -146,12 +162,11 @@ export default function PayablesPage() {
                     />
                 </div>
 
-                {/* --- SELETOR DE CATEGORIA INTELIGENTE (IGUAL CARGOS) --- */}
+                {/* --- SELETOR DE CATEGORIA --- */}
                 <div className="w-64">
                     <label className="text-xs font-bold text-gray-500">Categoria</label>
                     <div className="flex gap-1 h-[42px]">
                         {isCreatingCat ? (
-                            // MODO CRIAÇÃO
                             <>
                                 <input 
                                     autoFocus
@@ -170,7 +185,6 @@ export default function PayablesPage() {
                                 <button type="button" onClick={() => setIsCreatingCat(false)} className="text-red-500 px-2 font-bold">✕</button>
                             </>
                         ) : (
-                            // MODO SELEÇÃO
                             <>
                                 <select 
                                     className="border p-2 rounded text-black flex-1 h-full"
@@ -205,7 +219,7 @@ export default function PayablesPage() {
             </form>
         </div>
 
-        {/* --- LISTA DE CONTAS (Mantida Igual) --- */}
+        {/* --- LISTA DE CONTAS --- */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <table className="w-full text-left">
                 <thead className="bg-gray-50 border-b">
@@ -280,7 +294,7 @@ export default function PayablesPage() {
             </table>
         </div>
 
-        {/* --- MODAL DE PAGAMENTO (Mantido Igual) --- */}
+        {/* --- MODAL DE PAGAMENTO --- */}
         {payModalOpen && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                 <div className="bg-white p-6 rounded-lg shadow-xl w-96">

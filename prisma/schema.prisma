@@ -71,6 +71,7 @@ model User {
 
     verifyToken   String?   // O código secreto para validar
     phoneNumber   String?
+    receiveWhatsappAlerts Boolean @default(true)
 
     // Tabelas padrão do NextAuth (para login com Google/Github se precisar)
     accounts      NextAuthAccount[]

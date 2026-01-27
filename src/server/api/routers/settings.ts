@@ -96,4 +96,39 @@ export const settingsRouter = createTRPCRouter({
         where: { id: input.id, tenant: { users: { some: { id: ctx.session.user.id } } } },
       });
     }),
+
+  // =========================================================
+  // --- NOVAS FUNÇÕES: PERFIL DO USUÁRIO (ZAP) ---
+  // =========================================================
+
+  // 1. Buscar Perfil (Telefone e Preferências)
+  getProfile: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: {
+        phoneNumber: true,
+        receiveWhatsappAlerts: true
+      }
+    });
+  }),
+
+  // 2. Atualizar Perfil
+  updateProfile: protectedProcedure
+    .input(z.object({
+      phoneNumber: z.string(),
+      receiveWhatsappAlerts: z.boolean()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Remove qualquer caractere que não seja número antes de salvar
+      const cleanPhone = input.phoneNumber.replace(/\D/g, "");
+
+      return ctx.db.user.update({
+        where: { id: ctx.session.user.id },
+        data: {
+          phoneNumber: cleanPhone,
+          receiveWhatsappAlerts: input.receiveWhatsappAlerts
+        }
+      });
+    }),
+
 });

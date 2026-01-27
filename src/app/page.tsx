@@ -1,12 +1,13 @@
 import { auth } from "~/server/auth";
 import { api } from "~/trpc/server";
-import { db } from "~/server/db"; // <--- 1. IMPORTANTE: Importar o banco
+import { db } from "~/server/db";
 import { CreateTransaction } from "./_components/create-transaction";
 import { TransactionItem } from "./_components/transaction-item";
 import { AuthForm } from "./_components/auth-form";
 import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 import { SignOutButton } from "./_components/sign-out-button";
+import { DashboardCharts } from "./_components/dashboard-charts"; 
 
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -27,13 +28,11 @@ export default async function Home({ searchParams }: Props) {
     );
   }
 
-  // --- 2. BUSCA O PLANO ATUAL DO USUÁRIO ---
   const userFull = await db.user.findUnique({
     where: { id: session.user.id },
     include: { tenant: true }
   });
   const currentPlan = userFull?.tenant?.plan ?? "FREE";
-  // ------------------------------------------
 
   const params = await searchParams;
   const now = new Date();
@@ -44,8 +43,28 @@ export default async function Home({ searchParams }: Props) {
   const rawYear = Number(params?.year);
   const year = !rawYear && isNaN(rawYear) ? now.getFullYear() : rawYear;
 
-  const transactions = await api.transaction.getAll({ month, year });
-  const stats = await api.transaction.getDashboardStats({ month, year });
+  // 1. BUSCA DADOS BRUTOS (Com Decimal)
+  const rawTransactions = await api.transaction.getAll({ month, year });
+  const rawStats = await api.transaction.getDashboardStats({ month, year });
+
+  // 2. CORREÇÃO DO ERRO: CONVERTER DECIMAL PARA NUMBER
+  // O Recharts e o Client Component precisam de number simples
+ const transactions = rawTransactions.map((t) => ({
+    id: t.id,
+    description: t.description,
+    type: t.type,
+    date: t.date,
+    amount: Number(t.amount),            // Converte Decimal para Number
+    category: { name: t.category.name }, // Pega APENAS o nome, ignora o resto
+    account: { name: t.account.name },   // Pega APENAS o nome, ignora o initialBalance (Decimal)
+    member: t.member ? { name: t.member.name } : null,
+  }));
+
+  const stats = {
+    income: Number(rawStats.income),
+    expense: Number(rawStats.expense),
+    balance: Number(rawStats.balance),
+  };
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8 bg-gray-100">
@@ -53,8 +72,6 @@ export default async function Home({ searchParams }: Props) {
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
 
         <div className="flex items-center gap-4">
-          
-          {/* --- 3. EXIBIÇÃO DO NOME E PLANO --- */}
           <div className="text-right hidden sm:flex flex-col items-end">
             <p className="text-sm font-bold text-gray-700 leading-tight">
                 {session.user?.name}
@@ -67,7 +84,7 @@ export default async function Home({ searchParams }: Props) {
                             Free
                         </span>
                         <Link 
-                            href="/settings" // Link para sua página de planos/config
+                            href="/settings"
                             className="text-[10px] text-blue-600 font-bold hover:underline hover:text-blue-800 transition-colors flex items-center gap-0.5"
                         >
                             Fazer Upgrade 🚀
@@ -80,7 +97,6 @@ export default async function Home({ searchParams }: Props) {
                 )}
             </div>
           </div>
-          {/* ----------------------------------- */}
 
           <SignOutButton />
         </div>
@@ -89,34 +105,19 @@ export default async function Home({ searchParams }: Props) {
       <div className="w-full max-w-4xl space-y-6">
         {/* BOTÕES DE NAVEGAÇÃO */}
         <div className="flex flex-wrap gap-3">
-            <Link
-                href="/members"
-                className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm flex items-center gap-2"
-            >
+            <Link href="/members" className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm flex items-center gap-2">
                 👥 Membros
             </Link>
-            <Link 
-                href="/settings" 
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm flex items-center gap-2"
-            >
+            <Link href="/settings" className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm flex items-center gap-2">
                 ⚙️ Configurações
             </Link>
-            <Link 
-                href="/reports" 
-                className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full font-bold hover:bg-purple-200 transition text-sm flex items-center gap-2"
-            >
+            <Link href="/reports" className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full font-bold hover:bg-purple-200 transition text-sm flex items-center gap-2">
                 📊 Relatórios
             </Link>
-            <Link 
-                href="/staff" 
-                className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-bold hover:bg-orange-200 transition text-sm flex items-center gap-2"
-            >
+            <Link href="/staff" className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-bold hover:bg-orange-200 transition text-sm flex items-center gap-2">
                 👔 Equipe
             </Link>
-            <Link 
-                href="/payables" 
-                className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition text-sm flex items-center gap-2"
-            >
+            <Link href="/payables" className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition text-sm flex items-center gap-2">
                 💸 Contas a Pagar
             </Link>
         </div>
@@ -124,6 +125,7 @@ export default async function Home({ searchParams }: Props) {
         <MonthSelector />
         
         {/* CARDS DE RESUMO */}
+        {/* Agora usamos a variável 'stats' que já convertemos para number */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
             <p className="text-gray-500 text-sm">Entradas ({month}/{year})</p>
@@ -140,6 +142,9 @@ export default async function Home({ searchParams }: Props) {
             </p>
           </div>
         </div>
+
+        {/* GRÁFICOS */}
+        <DashboardCharts transactions={transactions} stats={stats} />
 
         <CreateTransaction />
 
@@ -165,7 +170,7 @@ export default async function Home({ searchParams }: Props) {
                     description: t.description,
                     type: t.type,
                     date: t.date,
-                    amount: Number(t.amount),
+                    amount: t.amount, // Aqui já é number agora
                     category: { name: t.category.name },
                     account: { name: t.account.name },
                     member: t.member ? { name: t.member.name } : null,

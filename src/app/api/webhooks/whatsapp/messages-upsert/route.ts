@@ -1,15 +1,20 @@
 import { db } from "~/server/db";
-import { analyzeMessage } from "~/lib/ai";
+import { analyzeIntent } from "~/lib/ai";
+import { sendWhatsAppMessage } from "~/lib/whatsapp";
+
+// Definimos o tipo para evitar o erro de "any" implícito
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type PrismaModel = any; 
 
 interface EvolutionWebhookBody {
   event: string;
-  sender?: string; 
+  sender?: string;
   data: {
     key: {
       remoteJid: string;
       fromMe: boolean;
       participant?: string;
-      senderPn?: string; // <--- NOVO CAMPO IMPORTANTE
+      senderPn?: string;
     };
     pushName?: string;
     message?: {
@@ -25,110 +30,153 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as EvolutionWebhookBody;
 
-    // FILTRO BÁSICO
+    // 1. FILTRO DE SEGURANÇA BÁSICO
     if (body.event !== "messages.upsert") {
       return new Response("Evento ignorado", { status: 200 });
     }
 
     const messageData = body.data;
-    
-    // Ignora minhas próprias mensagens
+
+    // Ignora mensagens enviadas pelo próprio bot/você
     if (messageData.key.fromMe) {
-        return new Response("Ignorando minha própria mensagem", { status: 200 });
+      return new Response("Ignorando minha própria mensagem", { status: 200 });
     }
 
-    // --- LÓGICA DE RECUPERAÇÃO DO TELEFONE (CORRIGIDA) ---
-    
-    // 1. Começamos com o remoteJid padrão
+    // --- 2. RECUPERAÇÃO DO TELEFONE ---
     let rawPhone = messageData.key.remoteJid;
 
-    // 2. A GRANDE CORREÇÃO:
-    // Se existir o campo 'senderPn' (que apareceu no seu log), usamos ele!
-    // Ele traz o número real (5579...) mesmo que o remoteJid seja @lid.
     if (messageData.key.senderPn) {
-        rawPhone = messageData.key.senderPn;
-    } 
-    // Fallback: Se não tiver senderPn mas for um grupo/bot, tenta participant
-    else if (rawPhone?.includes("@lid") && messageData.key.participant) {
-        rawPhone = messageData.key.participant;
+      rawPhone = messageData.key.senderPn;
+    } else if (rawPhone?.includes("@lid") && messageData.key.participant) {
+      rawPhone = messageData.key.participant;
     }
 
-    // Limpeza final: Remove sufixos e pega só os números
-    const phone = (rawPhone ?? "")
-      .replace("@s.whatsapp.net", "")
-      .replace("@lid", "")
-      .split(":")[0];
+    // Limpeza: remove caracteres não numéricos
+    // Correção do erro 110:9 -> removemos a "!" desnecessária e usamos "??"
+    const phone = (rawPhone ?? "").replace(/\D/g, "");
 
-    console.log(`📱 Telefone FINAL detectado: ${phone}`);
+    console.log(`📱 Telefone processado: ${phone}`);
 
-    // Busca usuário no banco
+    // --- 3. AUTENTICAÇÃO DO USUÁRIO ---
     const user = await db.user.findFirst({
       where: { phoneNumber: phone },
-      include: { tenant: true }
+      include: { tenant: true },
     });
 
     if (!user || !user.tenantId) {
-      console.log(`🔒 Usuário ${phone} não encontrado ou sem permissão.`);
-      // Tenta buscar pelo nome se tiver pushName, como fallback extra (opcional)
-      if (body.data.pushName) {
-          console.log(`ℹ️ Dica: O nome no WhatsApp é '${body.data.pushName}'`);
-      }
-      return new Response("Usuário não encontrado", { status: 200 });
+      console.log(`🔒 Usuário ${phone} desconhecido ou sem Tenant.`);
+      return new Response("Unauthorized", { status: 200 });
     }
 
-    // EXTRAIR O TEXTO
-    const text = 
-      messageData.message?.conversation ?? 
-      messageData.message?.extendedTextMessage?.text ?? 
+    // --- 4. EXTRAÇÃO DO TEXTO ---
+    const text =
+      messageData.message?.conversation ??
+      messageData.message?.extendedTextMessage?.text ??
       "";
 
     if (!text) return new Response("Sem texto", { status: 200 });
 
-    console.log(`📩 Processando mensagem de ${user.name}: "${text}"`);
+    console.log(`📩 Comando de ${user.name}: "${text}"`);
 
-    // CHAMAR A IA
-    const expenseData = await analyzeMessage(text);
+    // --- 5. PREPARAÇÃO DO "MENU" (CONTEXTO) ---
+    const [categories, accounts, staff] = await Promise.all([
+      db.category.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, name: true, type: true },
+      }),
+      db.account.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, name: true },
+      }),
+      db.staff.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, name: true },
+      }),
+    ]);
 
-    if (!expenseData) {
-        return new Response("Não é conta", { status: 200 });
+    const contextData = {
+      categories: categories
+        .map((c) => `- ${c.name} (${c.type}) -> ID: ${c.id}`)
+        .join("\n"),
+      accounts: accounts.map((a) => `- ${a.name} -> ID: ${a.id}`).join("\n"),
+      staff: staff.map((s) => `- ${s.name} -> ID: ${s.id}`).join("\n"),
+    };
+
+    // --- 6. CHAMADA À IA ---
+    const actionPlan = await analyzeIntent(text, user.tenantId, contextData);
+
+    // Se a IA falhar
+    if (!actionPlan) {
+      // Correção erro 163 e 170: Usamos rawPhone ?? "" para garantir string
+      await sendWhatsAppMessage(
+        rawPhone ?? phone, 
+        "🤔 Não consegui entender esse comando. Tente reformular."
+      );
+      return new Response("IA não retornou plano", { status: 200 });
     }
 
-    // BUSCAR CATEGORIA
-    let category = await db.category.findFirst({
-        where: { 
-            tenantId: user.tenantId,
-            type: "EXPENSE",
-            name: { contains: expenseData.categoryGuess }
-        }
-    });
+    // --- 7. EXECUTOR DE BANCO DE DADOS ---
+    console.log(`🛠 Executando no Prisma: ${actionPlan.model}.${actionPlan.action}`);
 
-    category ??= await db.category.findFirst({
-        where: { tenantId: user.tenantId, type: "EXPENSE" }
-    });
+    try {
+      // Correção erro 121, 133, 140, 150:
+      // Fazemos o cast explicito para 'any' para o TypeScript parar de reclamar
+      // que estamos acessando propriedades dinamicamente.
+      
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const model = (db as any)[actionPlan.model] as PrismaModel;
 
-    if (!category) {
-        return new Response("Erro: Nenhuma categoria cadastrada", { status: 200 });
-    }
-
-    // SALVAR NO BANCO
-    await db.accountPayable.create({
-      data: {
-        description: expenseData.description,
-        amount: expenseData.amount, 
-        dueDate: new Date(expenseData.dueDate),
-        categoryId: category.id,
-        tenantId: user.tenantId,
-        isPaid: false
+      if (!model) {
+        throw new Error(`Tabela '${actionPlan.model}' não encontrada no Prisma.`);
       }
-    });
 
-    console.log("✅ SUCESSO! Conta criada.");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      let dbResult: any;
+
+      switch (actionPlan.action) {
+        case "create":
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          dbResult = await model.create({
+            data: actionPlan.data,
+          });
+          break;
+
+        case "update":
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          dbResult = await model.updateMany({
+            where: actionPlan.where,
+            data: actionPlan.data,
+          });
+          break;
+
+        case "findFirst":
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          dbResult = await model.findFirst({
+            where: actionPlan.where,
+          });
+          break;
+          
+        default:
+          throw new Error(`Ação '${actionPlan.action}' não suportada.`);
+      }
+
+      console.log("✅ DB Sucesso:", dbResult);
+
+      // --- 8. FEEDBACK POSITIVO ---
+      await sendWhatsAppMessage(rawPhone ?? phone, actionPlan.successReply);
+
+    } catch (dbError) {
+      console.error("❌ Erro na Execução do Banco:", dbError);
+      
+      // --- 9. FEEDBACK NEGATIVO ---
+      await sendWhatsAppMessage(rawPhone ?? phone, actionPlan.errorReply);
+    }
 
     return new Response("Sucesso", { status: 200 });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-    console.error("❌ Erro no Webhook:", errorMessage);
+    console.error("❌ Erro Crítico no Webhook:", errorMessage);
     return new Response("Erro interno", { status: 500 });
   }
 }

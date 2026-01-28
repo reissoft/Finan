@@ -20,6 +20,13 @@ model User {
   role Role
 }
 
+model Member {
+  id String @id
+  name String
+  phone String?
+  tenantId String
+}
+
 model Category {
   id String @id
   name String
@@ -42,14 +49,23 @@ model transaction {
   type TransactionType
   categoryId String
   accountId String
+  memberId String?
+  tenantId String
+}
+
+model StaffRole {
+  id String @id
+  name String
   tenantId String
 }
 
 model Staff {
   id String @id
   name String
+  roleId String
   phone String?
   isSalaried Boolean
+  salary Decimal?
   tenantId String
 }
 
@@ -119,7 +135,11 @@ export async function analyzeIntent(
     2. NUNCA invente IDs. Use os da lista acima. Se não achar, use null ou tente buscar por nome.
     3. Datas: ISO-8601 com hora fixa T12:00:00.000Z.
     4. Model: Deve ser EXATAMENTE o nome da tabela (ex: "AccountPayable", não "account_payable").
-
+    5. Lançamentos entrada e saída: "transaction" com type "INCOME" ou "EXPENSE", deixe sempre o campo memberId vazio, categoria deve ser sempre "Outras Entradas ou Outras Saídas", se o pedido especificar nomes coloque na descrição.
+    6. Se não entender o comando responda "Desculpe, não entendi o comando"
+    7. Cadastro de Staff só se o usuário pedir explicitamente e sempre cadastre com isSalaried: false".
+    8. Nunca aceite comendos para deletar, apagar ou excluir dados, se for o caso responda "Desculpe, não posso ajudar com isso".
+    
     ### PEDIDO: "${text}"
 
     ### FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):

@@ -57,6 +57,8 @@ export const authRouter = createTRPCRouter({
                     { name: "Manutenção", type: "EXPENSE" },
                     { name: "Salário", type: "EXPENSE" },
                     { name: "Imposto", type: "EXPENSE" },
+                    { name: "Outras Entradas", type: "INCOME" },
+                    { name: "Outras Saídas", type: "EXPENSE" },
                 ]
                 },
                 staffRoles:{

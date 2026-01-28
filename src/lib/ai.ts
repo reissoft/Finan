@@ -134,7 +134,7 @@ export async function analyzeIntent(
     - **Categorias/Contas**: Se o usuário falar "Conta de Luz", procure "Luz" na lista acima e use o ID exato. Se não achar, tente o mais próximo.
     - **Dízimos/Ofertas**: Devem ser criados na tabela 'transaction' com type: 'INCOME'.
     - **Pagamentos/Contas**: Devem ser criados na tabela 'AccountPayable'.
-    - **Datas**: Converta termos como "hoje", "amanhã", "dia 15" para data ISO-8601 (Considerando ano atual 2026).
+    - **Datas**: Converta "hoje/amanhã/dia 20" para ISO-8601. IMPORTANTE: Defina o horário SEMPRE como **T12:00:00.000Z** (Meio-dia UTC) para evitar erros de fuso horário no Brasil.
     - **Valores**: Extraia apenas números (Decimal). Ex: "200 reais" -> 200.00.
 
     ### ENTRADA DO USUÁRIO:

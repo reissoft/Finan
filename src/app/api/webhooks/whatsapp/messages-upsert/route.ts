@@ -9,7 +9,9 @@ interface EvolutionWebhookBody {
       remoteJid: string;
       fromMe: boolean;
       participant?: string;
+      senderPn?: string; // <--- NOVO CAMPO IMPORTANTE
     };
+    pushName?: string;
     message?: {
       conversation?: string;
       extendedTextMessage?: {
@@ -35,29 +37,29 @@ export async function POST(req: Request) {
         return new Response("Ignorando minha própria mensagem", { status: 200 });
     }
 
-    // --- LÓGICA DE RECUPERAÇÃO DO TELEFONE ---
+    // --- LÓGICA DE RECUPERAÇÃO DO TELEFONE (CORRIGIDA) ---
     
-    // 1. Tenta pegar o remoteJid (Padrão: 5579...@s.whatsapp.net)
+    // 1. Começamos com o remoteJid padrão
     let rawPhone = messageData.key.remoteJid;
 
-    // 2. CORREÇÃO DO LINT AQUI: Usamos ?. em vez de &&
-    if (rawPhone?.includes("@lid")) {
-        
-        // Tenta pegar do participant (comum em alguns casos de grupo/bot)
-        if (messageData.key.participant) {
-            rawPhone = messageData.key.participant;
-        } 
-        // Se não tiver participant, tenta o sender (com Optional Chaining também)
-        else if (body.sender?.includes("557481318305") === false) { 
-             rawPhone = body.sender!; // O ! força dizendo que existe, pois passamos pelo if
-        }
+    // 2. A GRANDE CORREÇÃO:
+    // Se existir o campo 'senderPn' (que apareceu no seu log), usamos ele!
+    // Ele traz o número real (5579...) mesmo que o remoteJid seja @lid.
+    if (messageData.key.senderPn) {
+        rawPhone = messageData.key.senderPn;
+    } 
+    // Fallback: Se não tiver senderPn mas for um grupo/bot, tenta participant
+    else if (rawPhone?.includes("@lid") && messageData.key.participant) {
+        rawPhone = messageData.key.participant;
     }
-    
-    // Limpa o sufixo para ficar só o número (Ex: 5579920001944)
-    // Se rawPhone for nulo por algum motivo, retorna string vazia para não quebrar
-    const phone = (rawPhone ?? "").replace("@s.whatsapp.net", "").replace("@lid", "").split(":")[0];
 
-    console.log(`📱 Telefone detectado para busca: ${phone}`);
+    // Limpeza final: Remove sufixos e pega só os números
+    const phone = (rawPhone ?? "")
+      .replace("@s.whatsapp.net", "")
+      .replace("@lid", "")
+      .split(":")[0];
+
+    console.log(`📱 Telefone FINAL detectado: ${phone}`);
 
     // Busca usuário no banco
     const user = await db.user.findFirst({
@@ -67,6 +69,10 @@ export async function POST(req: Request) {
 
     if (!user || !user.tenantId) {
       console.log(`🔒 Usuário ${phone} não encontrado ou sem permissão.`);
+      // Tenta buscar pelo nome se tiver pushName, como fallback extra (opcional)
+      if (body.data.pushName) {
+          console.log(`ℹ️ Dica: O nome no WhatsApp é '${body.data.pushName}'`);
+      }
       return new Response("Usuário não encontrado", { status: 200 });
     }
 

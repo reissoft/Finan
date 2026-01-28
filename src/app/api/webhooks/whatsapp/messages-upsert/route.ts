@@ -1,15 +1,14 @@
 import { db } from "~/server/db";
 import { analyzeMessage } from "~/lib/ai";
 
-// 1. DEFINIMOS O MOLDE DOS DADOS (TIPAGEM)
-// Isso ensina ao TypeScript o que esperar do Evolution API
 interface EvolutionWebhookBody {
   event: string;
-  sender?: string;
+  sender?: string; 
   data: {
     key: {
       remoteJid: string;
       fromMe: boolean;
+      participant?: string;
     };
     message?: {
       conversation?: string;
@@ -22,41 +21,56 @@ interface EvolutionWebhookBody {
 
 export async function POST(req: Request) {
   try {
-    // 2. FORÇAMOS O TIPO AQUI USANDO "AS"
     const body = (await req.json()) as EvolutionWebhookBody;
 
-    // FILTRO BÁSICO: Ignora eventos que não sejam mensagens novas
-    const eventType = body.event;
-    if (eventType !== "messages.upsert") {
+    // FILTRO BÁSICO
+    if (body.event !== "messages.upsert") {
       return new Response("Evento ignorado", { status: 200 });
     }
 
     const messageData = body.data;
     
-    // Ignora mensagens enviadas por mim mesmo (fromMe)
+    // Ignora minhas próprias mensagens
     if (messageData.key.fromMe) {
         return new Response("Ignorando minha própria mensagem", { status: 200 });
     }
 
-    // IDENTIFICAR O USUÁRIO
-    const rawPhone = body.sender ?? messageData.key.remoteJid;
-    // Agora o replace funciona porque rawPhone é string garantida pela interface
-    const phone = rawPhone.replace("@s.whatsapp.net", "").replace("@lid", "");
-    console.log(`📱 Telefone detectado: ${phone}`);
+    // --- LÓGICA DE RECUPERAÇÃO DO TELEFONE ---
+    
+    // 1. Tenta pegar o remoteJid (Padrão: 5579...@s.whatsapp.net)
+    let rawPhone = messageData.key.remoteJid;
+
+    // 2. CORREÇÃO DO LINT AQUI: Usamos ?. em vez de &&
+    if (rawPhone?.includes("@lid")) {
+        
+        // Tenta pegar do participant (comum em alguns casos de grupo/bot)
+        if (messageData.key.participant) {
+            rawPhone = messageData.key.participant;
+        } 
+        // Se não tiver participant, tenta o sender (com Optional Chaining também)
+        else if (body.sender?.includes("557481318305") === false) { 
+             rawPhone = body.sender!; // O ! força dizendo que existe, pois passamos pelo if
+        }
+    }
+    
+    // Limpa o sufixo para ficar só o número (Ex: 5579920001944)
+    // Se rawPhone for nulo por algum motivo, retorna string vazia para não quebrar
+    const phone = (rawPhone ?? "").replace("@s.whatsapp.net", "").replace("@lid", "").split(":")[0];
+
+    console.log(`📱 Telefone detectado para busca: ${phone}`);
+
     // Busca usuário no banco
     const user = await db.user.findFirst({
       where: { phoneNumber: phone },
       include: { tenant: true }
     });
 
-    // Se não achar o usuário, ignora
     if (!user || !user.tenantId) {
-      console.log(`🔒 Mensagem recebida de ${phone} não autorizado.`);
+      console.log(`🔒 Usuário ${phone} não encontrado ou sem permissão.`);
       return new Response("Usuário não encontrado", { status: 200 });
     }
 
-    // EXTRAIR O TEXTO DA MENSAGEM
-    // Usamos o operador ?? (nullish coalescing) para pegar o primeiro que existir
+    // EXTRAIR O TEXTO
     const text = 
       messageData.message?.conversation ?? 
       messageData.message?.extendedTextMessage?.text ?? 
@@ -70,13 +84,10 @@ export async function POST(req: Request) {
     const expenseData = await analyzeMessage(text);
 
     if (!expenseData) {
-        console.log("🤖 IA não identificou uma conta a pagar na mensagem.");
         return new Response("Não é conta", { status: 200 });
     }
 
-    // SALVAR NO BANCO DE DADOS
-    
-    // Tenta achar uma categoria com nome parecido
+    // BUSCAR CATEGORIA
     let category = await db.category.findFirst({
         where: { 
             tenantId: user.tenantId,
@@ -85,16 +96,16 @@ export async function POST(req: Request) {
         }
     });
 
-    // Se não achou categoria especifica, pega a primeira disponível
     category ??= await db.category.findFirst({
         where: { tenantId: user.tenantId, type: "EXPENSE" }
     });
 
     if (!category) {
-        return new Response("Erro: Nenhuma categoria cadastrada no sistema", { status: 200 });
+        return new Response("Erro: Nenhuma categoria cadastrada", { status: 200 });
     }
 
-    const newPayable = await db.accountPayable.create({
+    // SALVAR NO BANCO
+    await db.accountPayable.create({
       data: {
         description: expenseData.description,
         amount: expenseData.amount, 
@@ -105,12 +116,11 @@ export async function POST(req: Request) {
       }
     });
 
-    console.log("✅ CONTA CRIADA VIA WHATSAPP:", newPayable.id);
+    console.log("✅ SUCESSO! Conta criada.");
 
     return new Response("Sucesso", { status: 200 });
 
   } catch (error) {
-    // Tratamento de erro seguro
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
     console.error("❌ Erro no Webhook:", errorMessage);
     return new Response("Erro interno", { status: 500 });

@@ -1,13 +1,12 @@
 import OpenAI from "openai";
 
-// Verificação de segurança
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("A variável de ambiente OPENAI_API_KEY não está configurada.");
 }
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 1. CONTEXTO DO SCHEMA
+
 const PRISMA_SCHEMA_CONTEXT = `
 enum TransactionType { INCOME EXPENSE }
 enum Role { USER TREASURER ADMIN }
@@ -67,7 +66,6 @@ model AccountPayable {
 }
 `;
 
-// 2. INTERFACES
 export interface TenantContext {
   categories: string;
   accounts: string;
@@ -85,49 +83,53 @@ export interface DatabaseAction {
   errorReply: string;
 }
 
-// 3. FUNÇÃO PRINCIPAL
 export async function analyzeIntent(
   text: string, 
   tenantId: string,
   context: TenantContext
 ): Promise<DatabaseAction | null> {
 
-  // --- O SEGREDO DA DATA CERTA ---
-  // Pegamos a data real do servidor agora
   const hoje = new Date();
   const dataFormatada = hoje.toLocaleDateString("pt-BR", { 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
-  const anoAtual = hoje.getFullYear(); // 2026
+  const anoAtual = hoje.getFullYear();
 
   const prompt = `
-    Você é o cérebro de um ERP Financeiro. Converta o pedido em JSON para o Prisma ORM.
+    Você é um especialista em Prisma ORM.
 
-    ### 📅 CONTEXTO DE TEMPO (CRÍTICO)
-    - **HOJE É:** ${dataFormatada}.
-    - O Ano Atual é **${anoAtual}**.
-    - Se o usuário disser "dia 20" e não especificar o ano, USE O ANO ${anoAtual}.
-    - Se o dia 20 já passou neste mês, assuma que é do mês que vem.
-    - JAMAIS use 2023, 2024 ou 2025, a menos que o usuário peça explicitamente "do ano passado".
+    ### OBJETIVO
+    Gerar um JSON exato para criar/buscar dados no banco, baseado no pedido do usuário.
 
-    ### ESTRUTURA DO BANCO
+    ### 📅 DATA DE HOJE
+    - Hoje é: ${dataFormatada}.
+    - Ano: ${anoAtual}.
+    - Se o usuário falar "dia 20" (sem mês), assuma o mês atual. Se já passou, mês que vem. USE ANO ${anoAtual}.
+
+    ### SCHEMA (TABELAS)
     ${PRISMA_SCHEMA_CONTEXT}
 
-    ### DADOS REAIS (Ids obrigatórios)
+    ### DADOS DO CLIENTE (IDs REAIS)
     [CATEGORIAS]: ${context.categories}
     [CONTAS]: ${context.accounts}
     [STAFF]: ${context.staff}
 
-    ### REGRAS
-    - 'tenantId': "${tenantId}" (Obrigatório em data e where).
-    - **Datas**: Retorne em formato ISO-8601 (Ex: "${anoAtual}-02-20T12:00:00.000Z").
-      ⚠️ IMPORTANTE: Sempre defina a hora como T12:00:00.000Z para evitar problemas de fuso horário.
-    - Valores: Float.
+    ### REGRAS OBRIGATÓRIAS
+    1. 'tenantId': "${tenantId}" deve estar em todos os 'data' e 'where'.
+    2. NUNCA invente IDs. Use os da lista acima. Se não achar, use null ou tente buscar por nome.
+    3. Datas: ISO-8601 com hora fixa T12:00:00.000Z.
+    4. Model: Deve ser EXATAMENTE o nome da tabela (ex: "AccountPayable", não "account_payable").
 
-    ### ENTRADA: "${text}"
+    ### PEDIDO: "${text}"
 
-    ### SAÍDA (JSON):
-    Responda apenas o JSON.
+    ### FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
+    {
+      "model": "AccountPayable", 
+      "action": "create",
+      "data": { ... },
+      "successReply": "Texto de sucesso",
+      "errorReply": "Texto de erro"
+    }
   `;
 
   try {
@@ -139,9 +141,21 @@ export async function analyzeIntent(
     });
 
     const content = completion.choices[0]?.message.content;
+    
+    // LOG DE DEPURAÇÃO (Para vermos o que a IA mandou se der erro)
+    console.log("🤖 RESPOSTA BRUTA DA IA:", content);
+
     if (!content) return null;
 
-    return JSON.parse(content) as DatabaseAction;
+    const result = JSON.parse(content) as DatabaseAction;
+    
+    // Validação extra simples
+    if (!result.model || !result.action) {
+        console.error("❌ IA retornou JSON incompleto:", result);
+        return null;
+    }
+
+    return result;
 
   } catch (error) {
     console.error("Erro IA:", error);

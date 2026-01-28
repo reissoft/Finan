@@ -1,6 +1,6 @@
 export async function sendWhatsAppMessage(to: string, text: string) {
   // Ajuste a URL se necessário (sem barra no final)
-  const baseUrl = "https://finan-production.up.railway.app"; 
+  const baseUrl = "https://evolution-api-production-6a59.up.railway.app"; 
   const instanceName = "instancia_principal"; 
   const apiKey = "Jesus_Te_Ama_2026"; 
 

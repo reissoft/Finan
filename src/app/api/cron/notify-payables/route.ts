@@ -110,7 +110,7 @@ async function sendWhatsApp(number: string, text: string) {
       body: JSON.stringify({
         number: cleanNumber,
         options: { delay: 1200, presence: "composing" },
-        textMessage: { text: text }
+        text: text 
       })
     });
 

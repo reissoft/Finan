@@ -1,15 +1,13 @@
 import OpenAI from "openai";
 
-// Verificação de segurança para não quebrar o build se a chave faltar
+// Verificação de segurança
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("A variável de ambiente OPENAI_API_KEY não está configurada.");
 }
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ------------------------------------------------------------------
-// 1. CONTEXTO DO SCHEMA (Estrutura simplificada do banco para a IA)
-// ------------------------------------------------------------------
+// 1. CONTEXTO DO SCHEMA
 const PRISMA_SCHEMA_CONTEXT = `
 enum TransactionType { INCOME EXPENSE }
 enum Role { USER TREASURER ADMIN }
@@ -69,117 +67,84 @@ model AccountPayable {
 }
 `;
 
-// ------------------------------------------------------------------
-// 2. INTERFACES (Exportadas para uso no route.ts)
-// ------------------------------------------------------------------
-
-// O "Menu" de IDs que passamos para a IA
+// 2. INTERFACES
 export interface TenantContext {
   categories: string;
   accounts: string;
   staff: string;
 }
 
-// A resposta estruturada que a IA devolve
 export interface DatabaseAction {
-  // Adicione aqui todos os Models que você quer que a IA possa manipular
   model: "AccountPayable" | "transaction" | "Category" | "User" | "Staff";
-  
-  // As ações permitidas
   action: "create" | "update" | "findFirst" | "findMany";
-
-  // Usamos 'any' aqui para permitir flexibilidade no retorno da IA
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
-  
-  // Usamos 'any' aqui para permitir filtros complexos
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   where?: any;
-
-  // Textos de resposta para o WhatsApp
   successReply: string;
   errorReply: string;
 }
 
-// ------------------------------------------------------------------
-// 3. FUNÇÃO PRINCIPAL (Exportada)
-// ------------------------------------------------------------------
+// 3. FUNÇÃO PRINCIPAL
 export async function analyzeIntent(
   text: string, 
   tenantId: string,
   context: TenantContext
 ): Promise<DatabaseAction | null> {
 
-  const prompt = `
-    Você é o cérebro de um ERP Financeiro (Igreja/Empresa). 
-    Sua missão é converter linguagem natural em um comando JSON para o Prisma ORM.
+  // --- O SEGREDO DA DATA CERTA ---
+  // Pegamos a data real do servidor agora
+  const hoje = new Date();
+  const dataFormatada = hoje.toLocaleDateString("pt-BR", { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  const anoAtual = hoje.getFullYear(); // 2026
 
-    ### 1. ESTRUTURA DO BANCO (SCHEMA)
+  const prompt = `
+    Você é o cérebro de um ERP Financeiro. Converta o pedido em JSON para o Prisma ORM.
+
+    ### 📅 CONTEXTO DE TEMPO (CRÍTICO)
+    - **HOJE É:** ${dataFormatada}.
+    - O Ano Atual é **${anoAtual}**.
+    - Se o usuário disser "dia 20" e não especificar o ano, USE O ANO ${anoAtual}.
+    - Se o dia 20 já passou neste mês, assuma que é do mês que vem.
+    - JAMAIS use 2023, 2024 ou 2025, a menos que o usuário peça explicitamente "do ano passado".
+
+    ### ESTRUTURA DO BANCO
     ${PRISMA_SCHEMA_CONTEXT}
 
-    ### 2. DADOS REAIS DESTE CLIENTE (Ids obrigatórios)
-    Use estritamente estes IDs quando o usuário mencionar os nomes abaixo.
-    
-    [CATEGORIAS DISPONÍVEIS]
-    ${context.categories}
+    ### DADOS REAIS (Ids obrigatórios)
+    [CATEGORIAS]: ${context.categories}
+    [CONTAS]: ${context.accounts}
+    [STAFF]: ${context.staff}
 
-    [CONTAS BANCÁRIAS / CAIXAS]
-    ${context.accounts}
+    ### REGRAS
+    - 'tenantId': "${tenantId}" (Obrigatório em data e where).
+    - **Datas**: Retorne em formato ISO-8601 (Ex: "${anoAtual}-02-20T12:00:00.000Z").
+      ⚠️ IMPORTANTE: Sempre defina a hora como T12:00:00.000Z para evitar problemas de fuso horário.
+    - Valores: Float.
 
-    [FUNCIONÁRIOS / STAFF]
-    ${context.staff}
+    ### ENTRADA: "${text}"
 
-    ### 3. REGRAS DE NEGÓCIO
-    - **TenantId**: É OBRIGATÓRIO incluir "tenantId": "${tenantId}" em todos os objetos 'data' (create) e 'where' (update/find).
-    - **Categorias/Contas**: Se o usuário falar "Conta de Luz", procure "Luz" na lista acima e use o ID exato. Se não achar, tente o mais próximo.
-    - **Dízimos/Ofertas**: Devem ser criados na tabela 'transaction' com type: 'INCOME'.
-    - **Pagamentos/Contas**: Devem ser criados na tabela 'AccountPayable'.
-    - **Datas**: Converta "hoje/amanhã/dia 20" para ISO-8601. IMPORTANTE: Defina o horário SEMPRE como **T12:00:00.000Z** (Meio-dia UTC) para evitar erros de fuso horário no Brasil.
-    - **Valores**: Extraia apenas números (Decimal). Ex: "200 reais" -> 200.00.
-
-    ### ENTRADA DO USUÁRIO:
-    "${text}"
-
-    ### SAÍDA ESPERADA (JSON VÁLIDO APENAS):
-    Responda apenas com o JSON, sem markdown.
-    Exemplo:
-    {
-      "model": "AccountPayable",
-      "action": "create",
-      "data": {
-        "description": "Conta de Luz",
-        "amount": 150.00,
-        "dueDate": "2026-02-10T00:00:00.000Z",
-        "categoryId": "cuid_da_categoria_luz",
-        "tenantId": "${tenantId}",
-        "isPaid": false
-      },
-      "successReply": "✅ Agendei a conta de Luz de R$ 150,00 para dia 10!",
-      "errorReply": "❌ Tive um problema ao tentar agendar a conta."
-    }
+    ### SAÍDA (JSON):
+    Responda apenas o JSON.
   `;
 
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: "system", content: prompt }],
-      model: "gpt-4-turbo-preview", // Modelo inteligente necessário para lidar com contexto
+      model: "gpt-4-turbo-preview", 
       response_format: { type: "json_object" },
-      temperature: 0, // Zero criatividade para garantir precisão nos IDs
+      temperature: 0,
     });
 
     const content = completion.choices[0]?.message.content;
-    
-    if (!content) {
-        console.error("IA retornou vazio");
-        return null;
-    }
+    if (!content) return null;
 
-    // Faz o parse do JSON retornado pela IA
-    const result = JSON.parse(content) as DatabaseAction;
-    return result;
+    return JSON.parse(content) as DatabaseAction;
 
   } catch (error) {
-    console.error("Erro fatal na IA:", error);
+    console.error("Erro IA:", error);
     return null;
   }
 }

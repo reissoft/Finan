@@ -13,7 +13,7 @@ function VerifyContent() {
   const verifyMutation = api.auth.verifyEmail.useMutation({
     onSuccess: () => {
       setStatus("✅ E-mail verificado com sucesso! Redirecionando...");
-      setTimeout(() => router.push(""), 3000); // Vai para o login
+      setTimeout(() => router.push("/"), 3000); // Vai para o login
     },
     onError: (err) => {
       setStatus("❌ Erro ao verificar: " + err.message);

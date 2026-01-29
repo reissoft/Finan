@@ -139,7 +139,7 @@ export default function BalancetePage() {
                 </p>
 
                 {isPlanError && (
-                    <button className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
+                    <button onClick={() => window.location.href = "/settings"} className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
                         ⭐ Quero ser PRO
                     </button>
                 )}

@@ -91,7 +91,7 @@ export const authRouter = createTRPCRouter({
       // ENVIA O EMAIL PELO RESEND
       try {
         await resend.emails.send({
-          from: 'onboarding@resend.dev', // Use este e-mail enquanto não configura domínio próprio
+          from: 'onboarding@finansistema.online', // Use este e-mail enquanto não configura domínio próprio
           to: input.email,
           subject: 'Confirme seu cadastro - Finan Igreja',
           html: `

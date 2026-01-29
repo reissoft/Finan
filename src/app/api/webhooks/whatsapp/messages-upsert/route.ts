@@ -1,6 +1,7 @@
 import { db } from "~/server/db";
 import { analyzeIntent } from "~/lib/ai";
 import { sendWhatsAppMessage } from "~/lib/whatsapp";
+import { use } from "react";
 
 // Definimos o tipo para evitar o erro de "any" implícito
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -101,6 +102,15 @@ export async function POST(req: Request) {
       accounts: accounts.map((a) => `- ${a.name} -> ID: ${a.id}`).join("\n"),
       staff: staff.map((s) => `- ${s.name} -> ID: ${s.id}`).join("\n"),
     };
+
+//BLoqueia se não for PRO
+    if(user.tenant?.plan !== "PRO") {
+      await sendWhatsAppMessage(
+        rawPhone ?? phone,
+        "Você precisa estar no plano PRO para usar este recurso."
+      );
+      return new Response("Plano não permite uso", { status: 200 });
+    }
 
     // --- 6. CHAMADA À IA ---
     const actionPlan = await analyzeIntent(text, user.tenantId, contextData);

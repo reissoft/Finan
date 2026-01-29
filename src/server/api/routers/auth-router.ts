@@ -33,6 +33,14 @@ export const authRouter = createTRPCRouter({
       // Gera um token aleatório seguro
       const verifyToken = crypto.randomUUID();
 
+      // 👇 1. Crie uma lógica para garantir slug único
+      // Pega a primeira parte do email
+      const baseSlug = input.email.split("@")[0]!.toLowerCase().replace(/[^a-z0-9]/g, ""); 
+      // Gera 4 caracteres aleatórios (ex: 'a1b2')
+      const randomSuffix = crypto.randomBytes(2).toString("hex");
+      // Resultado: "joao-a1b2" (Sempre único)
+      const uniqueSlug = `${baseSlug}-${randomSuffix}`;
+
       // CRIA O USUÁRIO JÁ COM UMA IGREJA NOVA
       const user = await ctx.db.user.create({
         data: {
@@ -43,10 +51,11 @@ export const authRouter = createTRPCRouter({
           emailVerified: null, // Ainda não verificado
           verifyToken: verifyToken, // Salva o token
           
+          
           tenant: {
             create: {
                 name: "Finanças de " + input.name,
-                slug: input.email.split("@")[0]!,
+                slug: uniqueSlug,
                 plan: "FREE",
                 categories: {
                 create: [

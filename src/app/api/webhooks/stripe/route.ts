@@ -5,13 +5,11 @@ import Stripe from "stripe";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: Request) {
-  console.log("📥 WEBHOOK: Recebido!"); // <--- Log 1
+  console.log("📥 WEBHOOK: Recebido!");
 
   const body = await req.text();
- const signature = (await headers()).get("Stripe-Signature")!;
+  const signature = (await headers()).get("Stripe-Signature")!;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  console.log("🔑 Segredo usado:", webhookSecret?.slice(0, 10) + "..."); // <--- Log 2
 
   let event: Stripe.Event;
 
@@ -23,27 +21,27 @@ export async function POST(req: Request) {
       signature,
       webhookSecret
     );
-    console.log("✅ Assinatura Válida! Evento:", event.type); // <--- Log 3
+    console.log("✅ Assinatura Válida! Evento:", event.type);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    console.error(`❌ Webhook Error: ${errorMessage}`);
     return new Response(`Webhook Error: ${errorMessage}`, { status: 400 });
   }
 
-  const session = event.data.object as Stripe.Checkout.Session;
-
+  // Lógica principal
   if (event.type === "checkout.session.completed") {
-    console.log("💰 Pagamento Aprovado! Processando..."); // <--- Log 4
-    console.log("Metadata recebido:", session.metadata);
-
-    // Recupera a assinatura completa para pegar as datas
-    const subscriptionId = session.subscription as string;
-    const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
-
-    if (subscriptionId) {
-        //const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const session = event.data.object as Stripe.Checkout.Session;
+    console.log("💰 Pagamento Aprovado! Processando...");
+    
+    // 1. Verificamos se existe ID de assinatura E ID do Tenant
+    if (session.subscription && session.metadata?.tenantId) {
         
-        if (session?.metadata?.tenantId) {
-            console.log("🔄 Atualizando Banco de Dados para Tenant:", session.metadata.tenantId);
+        try {
+            // 2. Buscamos a assinatura AGORA (Seguro, pois sabemos que o ID existe)
+            const subscriptionId = session.subscription as string;
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
+
+            console.log("🔄 Atualizando Banco para Tenant:", session.metadata.tenantId);
             
             await db.tenant.update({
                 where: { id: session.metadata.tenantId },
@@ -52,21 +50,26 @@ export async function POST(req: Request) {
                     stripeSubscriptionId: subscription.id,
                     stripeCustomerId: subscription.customer as string,
                     stripePriceId: subscription.items.data[0]?.price.id,
-                    // Adicionamos "as any" para forçar o TypeScript a aceitar
-                    //stripeCurrentPeriodEnd: new Date((subscription as Stripe.Subscription).current_period_end * 1000),
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                     stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+                    
                 },
             });
+
             console.log("✨ SUCESSO! Plano alterado para PRO.");
-        } else {
-            console.error("❌ ERRO: TenantId não encontrado no metadata.");
+
+        } catch (dbError) {
+            console.error("❌ Erro ao atualizar banco ou buscar subscription:", dbError);
+            return new Response("Erro interno", { status: 500 });
         }
+
+    } else {
+        console.error("⚠️ ALERTA: Webhook recebido sem Subscription ID ou Tenant ID.");
     }
   }
 
   return new Response(null, { status: 200 });
 }
+
 export function GET() {
   return new Response("ESTOU VIVO! O caminho está correto.");
 }

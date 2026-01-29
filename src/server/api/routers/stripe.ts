@@ -29,7 +29,7 @@ export const stripeRouter = createTRPCRouter({
         line_items: [
           {
             // Crie um PRODUTO no painel do Stripe e cole o ID do PREÇO aqui
-            price: "price_1Sstt8JT0n1PxnaSXsaWK1Cf", 
+            price: "price_1Suwn7JT0n1PxnaS5EvVlhX4", 
             quantity: 1,
           },
         ],

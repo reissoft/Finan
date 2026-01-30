@@ -90,7 +90,7 @@ export interface TenantContext {
 
 export interface DatabaseAction {
   model: "AccountPayable" | "transaction" | "Category" | "User" | "Staff";
-  action: "create" | "update" | "findFirst" | "findMany";
+  action: "create" | "update" | "findFirst" | "findMany" | "updateMany";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,9 +1,7 @@
 import { db } from "~/server/db";
 import { analyzeIntent } from "~/lib/ai";
 import { sendWhatsAppMessage } from "~/lib/whatsapp";
-import { use } from "react";
 
-// Definimos o tipo para evitar o erro de "any" implícito
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type PrismaModel = any; 
 
@@ -16,6 +14,7 @@ interface EvolutionWebhookBody {
       fromMe: boolean;
       participant?: string;
       senderPn?: string;
+      id: string; // Adicionamos o ID aqui
     };
     pushName?: string;
     message?: {
@@ -26,6 +25,21 @@ interface EvolutionWebhookBody {
     };
   };
 }
+
+// --- 🛡️ CACHE DE DEDUPLICAÇÃO (EM MEMÓRIA) ---
+// Isso impede que a mesma mensagem seja processada 2x em menos de 2 minutos
+const processedMessages = new Map<string, number>();
+
+// Limpa o cache a cada 10 minutos para não encher a memória RAM
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, timestamp] of processedMessages.entries()) {
+    if (now - timestamp > 5 * 60 * 1000) { // Remove mensagens mais velhas que 5 min
+      processedMessages.delete(id);
+    }
+  }
+}, 10 * 60 * 1000); 
+
 
 export async function POST(req: Request) {
   try {
@@ -43,6 +57,19 @@ export async function POST(req: Request) {
       return new Response("Ignorando minha própria mensagem", { status: 200 });
     }
 
+    // --- 🛡️ 1.1 VERIFICAÇÃO DE DUPLICIDADE ---
+    const messageId = messageData.key.id;
+    if (messageId && processedMessages.has(messageId)) {
+        console.log(`🚫 Mensagem duplicada ignorada: ${messageId}`);
+        // Retornamos 200 para a Evolution parar de tentar enviar
+        return new Response("Duplicata ignorada", { status: 200 });
+    }
+
+    // Se não é duplicada, adiciona no cache
+    if (messageId) {
+        processedMessages.set(messageId, Date.now());
+    }
+
     // --- 2. RECUPERAÇÃO DO TELEFONE ---
     let rawPhone = messageData.key.remoteJid;
 
@@ -53,26 +80,19 @@ export async function POST(req: Request) {
     }
 
     // Limpeza: remove caracteres não numéricos
-    // Correção do erro 110:9 -> removemos a "!" desnecessária e usamos "??"
     let phone = (rawPhone ?? "").replace(/\D/g, "");
 
     // Verifica se é um número brasileiro (começa com 55) e se tem 12 dígitos (falta o 9)
-  if (phone.startsWith("55") && phone.length === 12) {
-      // Pega os 4 primeiros (55 + DDD) -> ex: "5574"
+    if (phone.startsWith("55") && phone.length === 12) {
       const prefixo = phone.slice(0, 4);
-      
-      // Pega o resto do número -> ex: "81425700"
       const sufixo = phone.slice(4);
-      
-      // Verifica se o primeiro dígito do número é de celular (6, 7, 8 ou 9)
-      // Isso evita estragar números fixos que também têm 8 dígitos (ex: 3322-1234)
-      const primeiroDigito = parseInt(sufixo[0]!);
+      const primeiroDigito = parseInt(sufixo[0]!); // O ! garante que existe
       
       if (primeiroDigito >= 6) {
           phone = `${prefixo}9${sufixo}`;
           console.log("✅ 9º dígito adicionado automaticamente.");
       }
-  }
+    }
 
     console.log(`📱 Telefone processado: ${phone}`);
 
@@ -121,7 +141,7 @@ export async function POST(req: Request) {
       staff: staff.map((s) => `- ${s.name} -> ID: ${s.id}`).join("\n"),
     };
 
-//BLoqueia se não for PRO
+    // Bloqueia se não for PRO
     if(user.tenant?.plan !== "PRO") {
       await sendWhatsAppMessage(
         rawPhone ?? phone,
@@ -135,7 +155,6 @@ export async function POST(req: Request) {
 
     // Se a IA falhar
     if (!actionPlan) {
-      // Correção erro 163 e 170: Usamos rawPhone ?? "" para garantir string
       await sendWhatsAppMessage(
         rawPhone ?? phone, 
         "🤔 Não consegui entender esse comando. Tente reformular."
@@ -147,10 +166,6 @@ export async function POST(req: Request) {
     console.log(`🛠 Executando no Prisma: ${actionPlan.model}.${actionPlan.action}`);
 
     try {
-      // Correção erro 121, 133, 140, 150:
-      // Fazemos o cast explicito para 'any' para o TypeScript parar de reclamar
-      // que estamos acessando propriedades dinamicamente.
-      
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const model = (db as any)[actionPlan.model] as PrismaModel;
 
@@ -169,7 +184,7 @@ export async function POST(req: Request) {
           });
           break;
 
-        case "updateMany":
+        case "updateMany": 
         case "update":
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.updateMany({

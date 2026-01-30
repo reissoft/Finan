@@ -83,48 +83,36 @@ export const payablesRouter = createTRPCRouter({
     }),
 
   // 3. PAGAR CONTA (BAIXA + LANÇAMENTO NO CAIXA)
+  // 3. PAGAR CONTA (ATUALIZADO PARA USAR O TRIGGER DO BANCO)
   pay: protectedProcedure
     .input(z.object({
       id: z.string(),
-      accountId: z.string(), // De qual conta vai sair o dinheiro?
+      accountId: z.string(), // Mantemos no input para não quebrar o Frontend, mas o Trigger usará a conta padrão
       paidDate: z.date(),
     }))
     .mutation(async ({ ctx, input }) => {
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
 
-      
+      // 1. Verificamos se a conta existe e se já não foi paga
+      const payable = await ctx.db.accountPayable.findUnique({
+          where: { id: input.id }
+      });
 
-      // Usamos Transaction ($transaction) para garantir que ou faz tudo ou não faz nada
-      return ctx.db.$transaction(async (prisma) => {
-        
-        // 1. Busca a conta a pagar
-        const payable = await prisma.accountPayable.findUniqueOrThrow({
-            where: { id: input.id }
-        });
+      if (!payable) throw new Error("Conta não encontrada.");
+      if (payable.tenantId !== user.tenantId) throw new Error("Acesso negado.");
+      if (payable.isPaid) throw new Error("Esta conta já está paga!");
 
-        if (payable.isPaid) throw new Error("Esta conta já está paga!");
-
-        // 2. Atualiza status para PAGO
-        const updatedPayable = await prisma.accountPayable.update({
-            where: { id: input.id },
-            data: { isPaid: true, paidAt: input.paidDate }
-        });
-
-        // 3. Cria a TRANSAÇÃO de Saída (Expense) no Livro Caixa
-        await prisma.transaction.create({
-            data: {
-                description: `PAGTO: ${payable.description}`,
-                amount: payable.amount,
-                type: "EXPENSE",
-                date: input.paidDate,
-                categoryId: payable.categoryId,
-                accountId: input.accountId,
-                tenantId: user.tenantId!,
-            }
-        });
-
-        return updatedPayable;
+      // 2. APENAS ATUALIZAMOS O STATUS
+      // Removemos o "prisma.transaction.create".
+      // Ao mudar "isPaid" para true, o Trigger do PostgreSQL vai disparar 
+      // e criar o lançamento no caixa automaticamente em milissegundos.
+      return ctx.db.accountPayable.update({
+          where: { id: input.id },
+          data: { 
+              isPaid: true, 
+              paidAt: input.paidDate 
+          }
       });
     }),
 

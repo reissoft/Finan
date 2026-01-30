@@ -54,7 +54,25 @@ export async function POST(req: Request) {
 
     // Limpeza: remove caracteres não numéricos
     // Correção do erro 110:9 -> removemos a "!" desnecessária e usamos "??"
-    const phone = (rawPhone ?? "").replace(/\D/g, "");
+    let phone = (rawPhone ?? "").replace(/\D/g, "");
+
+    // Verifica se é um número brasileiro (começa com 55) e se tem 12 dígitos (falta o 9)
+  if (phone.startsWith("55") && phone.length === 12) {
+      // Pega os 4 primeiros (55 + DDD) -> ex: "5574"
+      const prefixo = phone.slice(0, 4);
+      
+      // Pega o resto do número -> ex: "81425700"
+      const sufixo = phone.slice(4);
+      
+      // Verifica se o primeiro dígito do número é de celular (6, 7, 8 ou 9)
+      // Isso evita estragar números fixos que também têm 8 dígitos (ex: 3322-1234)
+      const primeiroDigito = parseInt(sufixo[0]!);
+      
+      if (primeiroDigito >= 6) {
+          phone = `${prefixo}9${sufixo}`;
+          console.log("✅ 9º dígito adicionado automaticamente.");
+      }
+  }
 
     console.log(`📱 Telefone processado: ${phone}`);
 

@@ -146,7 +146,14 @@ export async function analyzeIntent(
     🔥 10. DIFERENÇA VITAL (POUPE ERROS):
        - Se for "transaction" (Caixa/Pago agora): OBRIGATÓRIO incluir 'accountId' e 'categoryId'.
        - Se for "AccountPayable" (Conta a Pagar/Agendado): PROIBIDO incluir 'accountId' ou 'account'. Essa tabela NÃO tem vínculo com banco. Use apenas 'categoryId', 'amount', 'dueDate', 'description'.
-    ### PEDIDO: "${text}"
+    🔥 11. AÇÕES EM MASSA ("TODAS" / "TUDO"):
+       Se o usuário pedir para "Baixar todas", "Pagar tudo que venceu" ou "Marcar todas como pagas":
+       - Use 'action': 'updateMany'.
+       - Use 'model': 'AccountPayable'.
+       - No 'where': { "isPaid": false, "dueDate": { "lte": "${new Date().toISOString()}" } } (Se for "atrasadas") OU apenas { "isPaid": false } (Se for "todas").
+       - No 'data': { "isPaid": true, "paidAt": "${new Date().toISOString()}" }.
+       - IMPORTANTE: O 'tenantId' deve estar no 'where', NUNCA no 'data' para updates.
+       ### PEDIDO: "${text}"
 
     ### FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
     {

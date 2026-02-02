@@ -179,29 +179,36 @@ export async function POST(req: Request) {
       switch (actionPlan.action) {
         case "create":
           // 1. Limpeza e Preparação dos Dados
-          // Removemos tenantId e accountId que vieram da IA para tratar manualmente
+          // ✅ CORREÇÃO: Agora tiramos também o categoryId do "bolo" (restData)
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { tenantId: _ign1, accountId: _ign2, ...restData } = actionPlan.data;
+          const { tenantId: _ign1, accountId: _ign2, categoryId: _ign3, ...restData } = actionPlan.data;
           
-          // 2. Resolve a Conta Bancária (Correção do null)
-          // Se a IA não mandou conta (null), pegamos a primeira conta cadastrada no sistema
+          // 2. Resolve a Conta Bancária (com a proteção ??)
           const finalAccountId = actionPlan.data.accountId ?? accounts[0]?.id;
 
           if (!finalAccountId) {
              throw new Error("Nenhuma conta bancária encontrada para lançar.");
           }
 
-          // 3. Criação com Sintaxe 'Connect' (Correção do erro Prisma)
+          // 3. Validação da Categoria
+          if (!actionPlan.data.categoryId) {
+             throw new Error("A IA não conseguiu identificar a categoria.");
+          }
+
+          // 4. Criação com Sintaxe 'Connect' para TODOS os relacionamentos
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.create({
             data: {
-              ...restData, // Descrição, Valor, Categoria, Data, etc.
+              ...restData, // Aqui vai description, amount, date, type...
               
-              // Define a conta bancária garantida
+              // Conecta a Conta
               account: { connect: { id: finalAccountId } },
               
-              // Define o Tenant usando a sintaxe que o Prisma ama (Connect)
-              tenant: { connect: { id: user.tenantId } }
+              // Conecta o Tenant
+              tenant: { connect: { id: user.tenantId } },
+
+              // ✅ CORREÇÃO FINAL: Conecta a Categoria do jeito que o Prisma gosta
+              category: { connect: { id: actionPlan.data.categoryId } }
             },
           });
           break;

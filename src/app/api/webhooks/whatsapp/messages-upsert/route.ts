@@ -178,38 +178,46 @@ export async function POST(req: Request) {
 
       switch (actionPlan.action) {
         case "create":
-          // 1. Limpeza e Preparação dos Dados
-          // ✅ CORREÇÃO: Agora tiramos também o categoryId do "bolo" (restData)
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { tenantId: _ign1, accountId: _ign2, categoryId: _ign3, ...restData } = actionPlan.data;
+          // 1. EXTRAÇÃO CIRÚRGICA 🏥
+          // Tiramos todos os IDs do objeto principal para não confundir o Prisma
+          const { 
+            tenantId: _tempTenant, 
+            accountId: _tempAccount, 
+            categoryId: _tempCategory, 
+            memberId: _tempMember, 
+            ...dadosLimpos // Aqui sobra só: description, amount, date, type
+          } = actionPlan.data;
           
-          // 2. Resolve a Conta Bancária (com a proteção ??)
-          const finalAccountId = actionPlan.data.accountId ?? accounts[0]?.id;
+          // 2. Resolução dos IDs
+          const idConta = _tempAccount ?? accounts[0]?.id;
+          const idCategoria = _tempCategory;
+          const idMembro = _tempMember; // Pode ser null
 
-          if (!finalAccountId) {
-             throw new Error("Nenhuma conta bancária encontrada para lançar.");
+          // 3. Validações de Segurança
+          if (!idConta) throw new Error("Erro: Nenhuma conta bancária disponível para o lançamento.");
+          if (!idCategoria) throw new Error("Erro: A categoria não foi identificada pela IA.");
+
+          // 4. Montagem do Objeto de Criação
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const payloadPrisma: any = {
+            ...dadosLimpos, // Espalha description, amount, date, type
+            
+            // CONEXÕES OBRIGATÓRIAS
+            tenant: { connect: { id: user.tenantId } },
+            account: { connect: { id: idConta } },
+            category: { connect: { id: idCategoria } },
+          };
+
+          // 5. Tratamento de Campo Opcional (Membro)
+          // Só adicionamos a conexão se existir um ID de membro válido
+          if (idMembro) {
+             payloadPrisma.member = { connect: { id: idMembro } };
           }
 
-          // 3. Validação da Categoria
-          if (!actionPlan.data.categoryId) {
-             throw new Error("A IA não conseguiu identificar a categoria.");
-          }
-
-          // 4. Criação com Sintaxe 'Connect' para TODOS os relacionamentos
+          // 6. Execução
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.create({
-            data: {
-              ...restData, // Aqui vai description, amount, date, type...
-              
-              // Conecta a Conta
-              account: { connect: { id: finalAccountId } },
-              
-              // Conecta o Tenant
-              tenant: { connect: { id: user.tenantId } },
-
-              // ✅ CORREÇÃO FINAL: Conecta a Categoria do jeito que o Prisma gosta
-              category: { connect: { id: actionPlan.data.categoryId } }
-            },
+            data: payloadPrisma,
           });
           break;
 

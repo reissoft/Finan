@@ -178,9 +178,31 @@ export async function POST(req: Request) {
 
       switch (actionPlan.action) {
         case "create":
+          // 1. Limpeza e Preparação dos Dados
+          // Removemos tenantId e accountId que vieram da IA para tratar manualmente
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { tenantId: _ign1, accountId: _ign2, ...restData } = actionPlan.data;
+          
+          // 2. Resolve a Conta Bancária (Correção do null)
+          // Se a IA não mandou conta (null), pegamos a primeira conta cadastrada no sistema
+          const finalAccountId = actionPlan.data.accountId ?? accounts[0]?.id;
+
+          if (!finalAccountId) {
+             throw new Error("Nenhuma conta bancária encontrada para lançar.");
+          }
+
+          // 3. Criação com Sintaxe 'Connect' (Correção do erro Prisma)
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.create({
-            data: actionPlan.data,
+            data: {
+              ...restData, // Descrição, Valor, Categoria, Data, etc.
+              
+              // Define a conta bancária garantida
+              account: { connect: { id: finalAccountId } },
+              
+              // Define o Tenant usando a sintaxe que o Prisma ama (Connect)
+              tenant: { connect: { id: user.tenantId } }
+            },
           });
           break;
 

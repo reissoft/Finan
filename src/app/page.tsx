@@ -33,6 +33,7 @@ export default async function Home({ searchParams }: Props) {
     include: { tenant: true }
   });
   const currentPlan = userFull?.tenant?.plan ?? "FREE";
+  const tenantId = userFull?.tenantId;
 
   const params = await searchParams;
   const now = new Date();
@@ -43,20 +44,35 @@ export default async function Home({ searchParams }: Props) {
   const rawYear = Number(params?.year);
   const year = !rawYear && isNaN(rawYear) ? now.getFullYear() : rawYear;
 
-  // 1. BUSCA DADOS BRUTOS (Com Decimal)
+  // --- 1. BUSCA DADOS MENSAIS (Via API) ---
   const rawTransactions = await api.transaction.getAll({ month, year });
   const rawStats = await api.transaction.getDashboardStats({ month, year });
 
-  // 2. CORREÇÃO DO ERRO: CONVERTER DECIMAL PARA NUMBER
-  // O Recharts e o Client Component precisam de number simples
- const transactions = rawTransactions.map((t) => ({
+  // --- 2. BUSCA DADOS ACUMULADOS (Direto no Banco) ---
+  // Calculamos o saldo total da história da igreja para mostrar no card acumulativo
+  let accumulatedBalance = 0;
+  
+  if (tenantId) {
+    const allTimeStats = await db.transaction.groupBy({
+      by: ["type"],
+      where: { tenantId: tenantId },
+      _sum: { amount: true },
+    });
+
+    const totalIncome = Number(allTimeStats.find((i) => i.type === "INCOME")?._sum.amount ?? 0);
+    const totalExpense = Number(allTimeStats.find((i) => i.type === "EXPENSE")?._sum.amount ?? 0);
+    accumulatedBalance = totalIncome - totalExpense;
+  }
+
+  // --- 3. TRATAMENTO DE DADOS ---
+  const transactions = rawTransactions.map((t) => ({
     id: t.id,
     description: t.description,
     type: t.type,
     date: t.date,
-    amount: Number(t.amount),            // Converte Decimal para Number
-    category: { name: t.category.name }, // Pega APENAS o nome, ignora o resto
-    account: { name: t.account.name },   // Pega APENAS o nome, ignora o initialBalance (Decimal)
+    amount: Number(t.amount),            
+    category: { name: t.category.name }, 
+    account: { name: t.account.name },   
     member: t.member ? { name: t.member.name } : null,
   }));
 
@@ -68,7 +84,7 @@ export default async function Home({ searchParams }: Props) {
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8 bg-gray-100">
-      <div className="w-full max-w-4xl flex justify-between items-center mb-8">
+      <div className="w-full max-w-6xl flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
 
         <div className="flex items-center gap-4">
@@ -102,7 +118,7 @@ export default async function Home({ searchParams }: Props) {
         </div>
       </div>
       
-      <div className="w-full max-w-4xl space-y-6">
+      <div className="w-full max-w-6xl space-y-6">
         {/* BOTÕES DE NAVEGAÇÃO */}
         <div className="flex flex-wrap gap-3">
             <Link href="/members" className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm flex items-center gap-2">
@@ -125,22 +141,40 @@ export default async function Home({ searchParams }: Props) {
         <MonthSelector />
         
         {/* CARDS DE RESUMO */}
-        {/* Agora usamos a variável 'stats' que já convertemos para number */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Alterado para grid-cols-4 para caber o novo card */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: Entradas do Mês */}
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-            <p className="text-gray-500 text-sm">Entradas ({month}/{year})</p>
-            <p className="text-2xl font-bold text-green-600">R$ {stats.income.toFixed(2)}</p>
+            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Entradas ({month}/{year})</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">R$ {stats.income.toFixed(2)}</p>
           </div>
+
+          {/* Card 2: Saídas do Mês */}
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
-            <p className="text-gray-500 text-sm">Saídas ({month}/{year})</p>
-            <p className="text-2xl font-bold text-red-600">R$ {stats.expense.toFixed(2)}</p>
+            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Saídas ({month}/{year})</p>
+            <p className="text-2xl font-bold text-red-600 mt-1">R$ {stats.expense.toFixed(2)}</p>
           </div>
+
+          {/* Card 3: Saldo do Mês */}
           <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
-            <p className="text-gray-500 text-sm">Saldo ({month}/{year})</p>
-            <p className={`text-2xl font-bold ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
+            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Resultado ({month}/{year})</p>
+            <p className={`text-2xl font-bold mt-1 ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
               R$ {stats.balance.toFixed(2)}
             </p>
           </div>
+
+          {/* Card 4: NOVO - Saldo Acumulado (Total Geral) */}
+          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-indigo-600 bg-indigo-50">
+            <div className="flex justify-between items-start">
+                <p className="text-indigo-800 text-xs uppercase font-bold tracking-wider">Saldo em Caixa (Total)</p>
+                <span className="text-[10px] bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">Acumulado</span>
+            </div>
+            <p className={`text-2xl font-bold mt-1 ${accumulatedBalance >= 0 ? "text-indigo-700" : "text-red-600"}`}>
+              R$ {accumulatedBalance.toFixed(2)}
+            </p>
+          </div>
+
         </div>
 
         {/* GRÁFICOS */}
@@ -151,7 +185,7 @@ export default async function Home({ searchParams }: Props) {
         {/* LISTA DE TRANSAÇÕES */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-semibold mb-4 border-b pb-2 flex justify-between items-center">
-            <span>Lançamentos</span>
+            <span>Lançamentos de {month}/{year}</span>
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
                 {transactions.length} itens
             </span>
@@ -170,7 +204,7 @@ export default async function Home({ searchParams }: Props) {
                     description: t.description,
                     type: t.type,
                     date: t.date,
-                    amount: t.amount, // Aqui já é number agora
+                    amount: t.amount,
                     category: { name: t.category.name },
                     account: { name: t.account.name },
                     member: t.member ? { name: t.member.name } : null,

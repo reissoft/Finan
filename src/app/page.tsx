@@ -8,6 +8,7 @@ import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 import { SignOutButton } from "./_components/sign-out-button";
 import { DashboardCharts } from "./_components/dashboard-charts"; 
+import { SmartReport } from "./_components/smart-report";
 
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -176,6 +177,8 @@ export default async function Home({ searchParams }: Props) {
           </div>
 
         </div>
+        {/* --- NOVO: RELATÓRIO INTELIGENTE --- */}
+        <SmartReport />
 
         {/* GRÁFICOS */}
         <DashboardCharts transactions={transactions} stats={stats} />

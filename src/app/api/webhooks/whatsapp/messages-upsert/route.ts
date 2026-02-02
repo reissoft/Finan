@@ -233,15 +233,41 @@ export async function POST(req: Request) {
             where: actionPlan.where,
           });
           break;
+
+          case "findMany":
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          dbResult = await model.findMany({
+            where: actionPlan.where,
+          });
+          break;
           
         default:
-          throw new Error(`Ação '${actionPlan.action}' não suportada.`);
+          throw new Error(`Ação não suportada.`);
       }
 
       console.log("✅ DB Sucesso:", dbResult);
 
       // --- 8. FEEDBACK POSITIVO ---
-      await sendWhatsAppMessage(rawPhone ?? phone, actionPlan.successReply);
+      console.log("✅ DB Sucesso, linhas afetadas/retornadas:", Array.isArray(dbResult) ? dbResult.length : 1);
+
+      // --- 8. PREPARAÇÃO DA RESPOSTA (NOVO) ---
+      let finalMessage = actionPlan.successReply;
+
+      // Se foi uma busca (findMany/findFirst), anexa os dados formatados
+      if (actionPlan.action.startsWith("find")) {
+         const formattedData = formatDatabaseResult(actionPlan.model, dbResult);
+         finalMessage += `\n${formattedData}`;
+      }
+
+      // Se foi um updateMany (ex: "Pagar todas"), mostra quantos foram afetados
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (actionPlan.action === "updateMany" && dbResult?.count) {
+         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         finalMessage += `\n\n(Total processado: ${dbResult.count} itens)`;
+      }
+
+      // --- 9. ENVIO DO WHATSAPP ---
+      await sendWhatsAppMessage(rawPhone ?? phone, finalMessage);
 
     } catch (dbError) {
       console.error("❌ Erro na Execução do Banco:", dbError);
@@ -256,5 +282,50 @@ export async function POST(req: Request) {
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
     console.error("❌ Erro Crítico no Webhook:", errorMessage);
     return new Response("Erro interno", { status: 500 });
+  }
+}
+
+// --- FUNÇÃO AUXILIAR DE FORMATAÇÃO (NOVA) ---
+// Transforma JSON do banco em texto bonitinho pro WhatsApp
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatDatabaseResult(model: string, data: any): string {
+  if (!data) return "";
+  
+  // Se for uma lista (Array), formata item por item
+  if (Array.isArray(data)) {
+    if (data.length === 0) return "\n_(Nenhum registro encontrado)_";
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+    return "\n" + data.map((item) => formatSingleItem(model, item)).join("\n");
+  }
+
+  // Se for um item único
+  return "\n" + formatSingleItem(model, data);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatSingleItem(model: string, item: any): string {
+  const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  const date = item.date ?? item.dueDate ? new Date(item.date ?? item.dueDate).toLocaleDateString('pt-BR') : "";
+
+  switch (model) {
+    case "AccountPayable":
+      // Ex: 📅 10/02 - Luz (R$ 150,00) - [Pendente]
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const status = item.isPaid ? "✅ Pago" : "⏳ Aberto";
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      return `📅 ${date} - *${item.description}*\n   💰 ${currency.format(item.amount)} - ${status}`;
+
+    case "transaction":
+      // Ex: 💰 R$ 100,00 - Oferta (Entrada) - 10/02
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const icon = item.type === "INCOME" ? "📈" : "📉";
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      return `${icon} *${currency.format(item.amount)}* - ${item.description}\n   📅 ${date}`;
+
+    default:
+      // Genérico para tabelas que não mapeamos (Category, Member)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      return `• ${item.name ?? item.description ?? JSON.stringify(item)}`;
   }
 }

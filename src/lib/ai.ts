@@ -168,7 +168,7 @@ export async function analyzeIntent(
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: "system", content: prompt }],
-      model: "gpt-4-turbo-preview", 
+      model: "gpt-4o-mini", 
       response_format: { type: "json_object" },
       temperature: 0,
     });

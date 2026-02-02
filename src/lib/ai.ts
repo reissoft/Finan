@@ -139,7 +139,9 @@ export async function analyzeIntent(
     6. Se não entender o comando responda "Desculpe, não entendi o comando"
     7. Cadastro de Staff só se o usuário pedir explicitamente e sempre cadastre com isSalaried: false".
     8. Nunca aceite comendos para deletar, apagar ou excluir dados, se for o caso responda "Desculpe, não posso ajudar com isso".
-    
+    🔥 9. DIFERENÇA VITAL (POUPE ERROS):
+       - Se for "transaction" (Caixa/Pago agora): OBRIGATÓRIO incluir 'accountId' e 'categoryId'.
+       - Se for "AccountPayable" (Conta a Pagar/Agendado): PROIBIDO incluir 'accountId' ou 'account'. Essa tabela NÃO tem vínculo com banco. Use apenas 'categoryId', 'amount', 'dueDate', 'description'.
     ### PEDIDO: "${text}"
 
     ### FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):

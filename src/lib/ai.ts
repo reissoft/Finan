@@ -128,18 +128,22 @@ export async function analyzeIntent(
     ### DADOS DO CLIENTE (IDs REAIS)
     [CATEGORIAS]: ${context.categories}
     [CONTAS]: ${context.accounts}
+    *(Use o primeiro ID desta lista como 'Conta Padrão' se o usuário não especificar o banco em lançamentos de caixa)*
     [STAFF]: ${context.staff}
 
     ### REGRAS OBRIGATÓRIAS
     1. 'tenantId': "${tenantId}" deve estar em todos os 'data' e 'where'.
-    2. NUNCA invente IDs. Use os da lista acima. Se não achar, use null ou tente buscar por nome.
-    3. Datas: ISO-8601 com hora fixa T12:00:00.000Z.
-    4. Model: Deve ser EXATAMENTE o nome da tabela (ex: "AccountPayable", não "account_payable").
-    5. Lançamentos entrada e saída: "transaction" com type "INCOME" ou "EXPENSE", deixe sempre o campo memberId vazio, categoria deve ser sempre "Outras Entradas ou Outras Saídas", se o pedido especificar nomes coloque na descrição.
-    6. Se não entender o comando responda "Desculpe, não entendi o comando"
-    7. Cadastro de Staff só se o usuário pedir explicitamente e sempre cadastre com isSalaried: false".
-    8. Nunca aceite comendos para deletar, apagar ou excluir dados, se for o caso responda "Desculpe, não posso ajudar com isso".
-    🔥 9. DIFERENÇA VITAL (POUPE ERROS):
+    2. Respeite RIGOROSAMENTE o Schema.
+       - Se for 'transaction': DEVE incluir 'accountId' e 'categoryId'.
+       - Se for 'AccountPayable': DEVE incluir 'categoryId', mas JAMAIS inclua 'accountId' (essa tabela não tem vínculo bancário).
+    3. NUNCA invente IDs. Use os da lista acima. Se não achar, use null ou tente buscar por nome.
+    4. Datas: ISO-8601 com hora fixa T12:00:00.000Z.
+    5. Model: Deve ser EXATAMENTE o nome da tabela (ex: "AccountPayable", não "account_payable").
+    6. Lançamentos entrada e saída: "transaction" com type "INCOME" ou "EXPENSE", deixe sempre o campo memberId vazio, categoria deve ser sempre "Outras Entradas ou Outras Saídas", se o pedido especificar nomes coloque na descrição.
+    7. Se não entender o comando responda "Desculpe, não entendi o comando"
+    8. Cadastro de Staff só se o usuário pedir explicitamente e sempre cadastre com isSalaried: false".
+    9. Nunca aceite comendos para deletar, apagar ou excluir dados, se for o caso responda "Desculpe, não posso ajudar com isso".
+    🔥 10. DIFERENÇA VITAL (POUPE ERROS):
        - Se for "transaction" (Caixa/Pago agora): OBRIGATÓRIO incluir 'accountId' e 'categoryId'.
        - Se for "AccountPayable" (Conta a Pagar/Agendado): PROIBIDO incluir 'accountId' ou 'account'. Essa tabela NÃO tem vínculo com banco. Use apenas 'categoryId', 'amount', 'dueDate', 'description'.
     ### PEDIDO: "${text}"

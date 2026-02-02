@@ -178,46 +178,43 @@ export async function POST(req: Request) {
 
       switch (actionPlan.action) {
         case "create":
-          // 1. EXTRAÇÃO CIRÚRGICA 🏥
-          // Tiramos todos os IDs do objeto principal para não confundir o Prisma
-          const { 
-            tenantId: _tempTenant, 
-            accountId: _tempAccount, 
-            categoryId: _tempCategory, 
-            memberId: _tempMember, 
-            ...dadosLimpos // Aqui sobra só: description, amount, date, type
-          } = actionPlan.data;
+          // DADOS PUROS VINDOS DA IA
+          const rawData = actionPlan.data;
           
-          // 2. Resolução dos IDs
-          const idConta = _tempAccount ?? accounts[0]?.id;
-          const idCategoria = _tempCategory;
-          const idMembro = _tempMember; // Pode ser null
-
-          // 3. Validações de Segurança
-          if (!idConta) throw new Error("Erro: Nenhuma conta bancária disponível para o lançamento.");
-          if (!idCategoria) throw new Error("Erro: A categoria não foi identificada pela IA.");
-
-          // 4. Montagem do Objeto de Criação
+          // O objeto que será enviado ao Prisma
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const payloadPrisma: any = {
-            ...dadosLimpos, // Espalha description, amount, date, type
-            
-            // CONEXÕES OBRIGATÓRIAS
-            tenant: { connect: { id: user.tenantId } },
-            account: { connect: { id: idConta } },
-            category: { connect: { id: idCategoria } },
-          };
+          const prismaPayload: any = {};
 
-          // 5. Tratamento de Campo Opcional (Membro)
-          // Só adicionamos a conexão se existir um ID de membro válido
-          if (idMembro) {
-             payloadPrisma.member = { connect: { id: idMembro } };
+          // --- 🔄 TRANSFORMADOR GENÉRICO (A MÁGICA) ---
+          // Varre cada campo que a IA mandou e decide como formatar para o Prisma
+          for (const [key, value] of Object.entries(rawData)) {
+            
+            // 1. Ignora campos nulos/undefined (limpeza)
+            if (value === null || value === undefined) continue;
+
+            // 2. Se for o Tenant (Sempre obrigatório)
+            if (key === "tenantId") {
+                prismaPayload.tenant = { connect: { id: user.tenantId } };
+                continue;
+            }
+
+            // 3. Se for qualquer outro campo de relacionamento (termina em 'Id')
+            // Ex: categoryId -> category: { connect: { id: ... } }
+            // Ex: accountId  -> account:  { connect: { id: ... } }
+            if (key.endsWith("Id") && key !== "id") {
+                const relationName = key.replace("Id", ""); // Remove o sufixo "Id"
+                prismaPayload[relationName] = { connect: { id: value } };
+            } 
+            // 4. Se for dado comum (description, amount, date...)
+            else {
+                prismaPayload[key] = value;
+            }
           }
 
-          // 6. Execução
+          // Execução Cega (O Prisma valida se os campos existem ou não)
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.create({
-            data: payloadPrisma,
+            data: prismaPayload,
           });
           break;
 

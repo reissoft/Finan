@@ -1,10 +1,111 @@
 "use server";
 
 import { db } from "~/server/db";
-import OpenAI from "openai";
+import { generateWithGroq } from "~/lib/groq";
 import { auth } from "~/server/auth";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Sistema inteligente de escolha de provider
+async function getAIProvider() {
+  const provider = process.env.AI_PROVIDER?.toLowerCase();
+
+  switch (provider) {
+    case "groq":
+      return {
+        name: "groq",
+        generate: generateWithGroq,
+        cost: 0.24, // $0.24 por 1M tokens
+      };
+
+    case "openai":
+      // Fallback para OpenAI
+      const { default: OpenAI } = await import("openai");
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      return {
+        name: "openai",
+        generate: async (prompt: string) => {
+          const completion = await openai.chat.completions.create({
+            messages: [{ role: "system", content: prompt }],
+            model: "gpt-4o-mini",
+            response_format: { type: "json_object" },
+            max_tokens: 1000,
+            temperature: 0.1,
+          });
+          return completion.choices[0]?.message?.content ?? "{}";
+        },
+        cost: 10.0, // $10.00 por 1M tokens
+      };
+
+    case "hybrid":
+      // Escolhe baseado no plano do usuário
+      const session = await auth();
+      if (!session?.user?.id) throw new Error("Não autorizado");
+
+      const user = await db.user.findUnique({
+        where: { id: session.user.id },
+        include: { tenant: true },
+      });
+
+      if (!user?.tenant) throw new Error("Usuário sem organização");
+
+      // FREE usa OpenAI (limitado), PRO usa Groq (ilimitado)
+      if (user.tenant.plan === "PRO") {
+        console.log("🚀 Usando Groq para plano PRO");
+        return {
+          name: "groq",
+          generate: generateWithGroq,
+          cost: 0.24,
+        };
+      } else {
+        console.log("🎯 Usando OpenAI para plano FREE");
+        const { default: OpenAI } = await import("openai");
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        return {
+          name: "openai",
+          generate: async (prompt: string) => {
+            const completion = await openai.chat.completions.create({
+              messages: [{ role: "system", content: prompt }],
+              model: "gpt-4o-mini",
+              response_format: { type: "json_object" },
+              max_tokens: 1000,
+              temperature: 0.1,
+            });
+            return completion.choices[0]?.message?.content ?? "{}";
+          },
+          cost: 10.0,
+        };
+      }
+
+    default:
+      // Padrão: Groq se disponível, senão OpenAI
+      if (process.env.GROQ_API_KEY) {
+        console.log("🤖 Usando Groq (padrão)");
+        return {
+          name: "groq",
+          generate: generateWithGroq,
+          cost: 0.24,
+        };
+      } else {
+        console.log("⚠️ Usando OpenAI (fallback)");
+        const { default: OpenAI } = await import("openai");
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        return {
+          name: "openai",
+          generate: async (prompt: string) => {
+            const completion = await openai.chat.completions.create({
+              messages: [{ role: "system", content: prompt }],
+              model: "gpt-4o-mini",
+              response_format: { type: "json_object" },
+              max_tokens: 1000,
+              temperature: 0.1,
+            });
+            return completion.choices[0]?.message?.content ?? "{}";
+          },
+          cost: 10.0,
+        };
+      }
+  }
+}
 
 export async function generateSmartReport(userQuery: string) {
   const session = await auth();
@@ -62,15 +163,14 @@ export async function generateSmartReport(userQuery: string) {
   `;
 
   try {
-    const completion = await openai.chat.completions.create({
-      messages: [{ role: "system", content: prompt }],
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-    });
-
-    const filterData = JSON.parse(
-      completion.choices[0]?.message.content ?? "{}",
+    // Escolher provider inteligente
+    const aiProvider = await getAIProvider();
+    console.log(
+      `🎯 Usando provider: ${aiProvider.name} (custo: $${aiProvider.cost}/1M tokens)`,
     );
+
+    const responseContent = await aiProvider.generate(prompt);
+    const filterData = JSON.parse(responseContent);
 
     // --- 🛠️ CORREÇÃO DE DATA (SAFETY CHECK) ---
     // Se a IA mandou null OU mandou uma data inválida (ex: 30 de fevereiro), usamos o mês atual.

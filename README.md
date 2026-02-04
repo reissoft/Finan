@@ -1,29 +1,80 @@
-# Create T3 App
+# Finan - Sistema Financeiro para Igrejas
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Plataforma SaaS completa para gestão financeira de igrejas, desenvolvida com Next.js 15, tRPC, Prisma e arquitetura multi-tenant.
 
-## What's next? How do I make an app with this?
+## 🚀 Quick Start
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+```bash
+# Clone e instale
+git clone https://github.com/yourusername/finan.git
+cd finan
+npm install
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+# Configure ambiente
+cp .env.example .env.local
+# Edite suas credenciais
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+# Setup database
+npx prisma generate
+npx prisma db push
+npx tsx prisma/seed.ts
 
-## Learn More
+# Inicie desenvolvimento
+npm run dev
+```
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+## 📚 Documentação
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+- [📖 Guia Completo](./docs/README.md)
+- [🔧 API Reference](./docs/API.md)
+- [🚀 Deployment Guide](./docs/DEPLOYMENT.md)
+- [💻 Development Guide](./docs/DEVELOPMENT.md)
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+## ✨ Features
 
-## How do I deploy this?
+- 💰 **Gestão Financeira**: Controle completo de entradas e saídas
+- 👥 **Gestão de Membros**: Cadastro e acompanhamento de dízimos
+- 📊 **Relatórios Inteligentes**: Dashboard e relatórios com IA
+- 💳 **Pagamentos**: Integração Stripe para assinaturas
+- 🔔 **Notificações**: WhatsApp e email automáticos
+- 🏗️ **Multi-tenant**: Arquitetura escalável para múltiplas igrejas
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+## 🛠️ Stack
+
+```
+Frontend: Next.js 15 + React 19 + Tailwind CSS
+Backend:  tRPC + NextAuth.js + Prisma ORM
+Database: PostgreSQL (multi-tenant)
+Deploy:   Vercel + Docker
+```
+
+## 📁 Estrutura
+
+```
+finan/
+├── docs/                 # Documentação completa
+├── prisma/              # Schema e seeds
+├── src/
+│   ├── app/            # App Router (Next.js 15)
+│   ├── lib/            # Utilitários
+│   └── server/         # Backend tRPC
+└── package.json
+```
+
+## 🚀 Scripts
+
+```bash
+npm run dev          # Development server
+npm run build        # Production build
+npm run db:studio    # Prisma Studio
+npm run lint         # ESLint
+npm run typecheck    # TypeScript check
+```
+
+## 🤝 Contribuição
+
+Contribuições são bem-vindas! Veja o [Development Guide](./docs/DEVELOPMENT.md).
+
+## 📄 Licença
+
+MIT License - veja [LICENSE](LICENSE).

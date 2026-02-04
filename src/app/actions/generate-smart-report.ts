@@ -17,6 +17,13 @@ export async function generateSmartReport(userQuery: string) {
 
   if (!user?.tenantId) throw new Error("Usuário sem organização");
 
+  // Verificação de plano PRO no servidor
+  if (!user.tenant || user.tenant.plan !== "PRO") {
+    throw new Error(
+      "Relatórios com IA são exclusivos do plano PRO. Faça upgrade para acessar esta funcionalidade.",
+    );
+  }
+
   // 1. Contexto de Categorias
   const categories = await db.category.findMany({
     where: { tenantId: user.tenantId },
@@ -61,39 +68,41 @@ export async function generateSmartReport(userQuery: string) {
       response_format: { type: "json_object" },
     });
 
-    const filterData = JSON.parse(completion.choices[0]?.message.content ?? "{}");
+    const filterData = JSON.parse(
+      completion.choices[0]?.message.content ?? "{}",
+    );
 
     // --- 🛠️ CORREÇÃO DE DATA (SAFETY CHECK) ---
     // Se a IA mandou null OU mandou uma data inválida (ex: 30 de fevereiro), usamos o mês atual.
-    
+
     let startIso = filterData.startDate;
     let endIso = filterData.endDate;
-    
+
     // Função auxiliar para pegar mês atual se necessário
     const now = new Date();
     if (!startIso || !endIso) {
-        // Primeiro dia do mês atual
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        firstDay.setHours(0, 0, 0, 0);
-        
-        // Último dia do mês atual (Matematicamente correto)
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0); 
-        lastDay.setHours(23, 59, 59, 999);
+      // Primeiro dia do mês atual
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      firstDay.setHours(0, 0, 0, 0);
 
-        startIso ??= firstDay.toISOString();
-        endIso ??= lastDay.toISOString();
+      // Último dia do mês atual (Matematicamente correto)
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
+
+      startIso ??= firstDay.toISOString();
+      endIso ??= lastDay.toISOString();
     }
 
     // Validação extra: O Prisma explode se a string for data inválida (ex: 2026-02-29).
     // Tentamos criar um objeto Date. Se der "Invalid Date", voltamos para hoje.
     try {
-        new Date(startIso).toISOString();
-        new Date(endIso).toISOString();
+      new Date(startIso).toISOString();
+      new Date(endIso).toISOString();
     } catch (e) {
-        // Se a data da IA estiver quebrada, usa o dia de hoje como fallback de emergência
-        console.log("Data inválida detectada, usando fallback.");
-        startIso = new Date().toISOString();
-        endIso = new Date().toISOString();
+      // Se a data da IA estiver quebrada, usa o dia de hoje como fallback de emergência
+      console.log("Data inválida detectada, usando fallback.");
+      startIso = new Date().toISOString();
+      endIso = new Date().toISOString();
     }
     // ------------------------------------------
 
@@ -123,21 +132,23 @@ export async function generateSmartReport(userQuery: string) {
 
     // Calcula total
     const total = transactions.reduce((acc, curr) => {
-        return acc + Number(curr.amount);
+      return acc + Number(curr.amount);
     }, 0);
 
     return {
       success: true,
       report: {
         title: filterData.reportTitle,
-        period: `${new Date(startIso).toLocaleDateString('pt-BR')} até ${new Date(endIso).toLocaleDateString('pt-BR')}`,
+        period: `${new Date(startIso).toLocaleDateString("pt-BR")} até ${new Date(endIso).toLocaleDateString("pt-BR")}`,
         data: transactions,
-        total: total
-      }
+        total: total,
+      },
     };
-
   } catch (error) {
     console.error("Erro no Smart Report:", error);
-    return { success: false, error: "Não foi possível gerar o relatório. Tente reformular o pedido." };
+    return {
+      success: false,
+      error: "Não foi possível gerar o relatório. Tente reformular o pedido.",
+    };
   }
 }

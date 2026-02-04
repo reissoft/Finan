@@ -1,86 +1,38 @@
-import OpenAI from "openai";
+import { generateWithGroq } from "./groq";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("A variável de ambiente OPENAI_API_KEY não está configurada.");
+// Sistema inteligente de provider
+async function getAIProvider() {
+  const provider = process.env.AI_PROVIDER?.toLowerCase();
+
+  if (provider === "groq" || process.env.GROQ_API_KEY) {
+    console.log("🤖 Usando Groq para análise de comandos");
+    return { generate: generateWithGroq, name: "groq" };
+  }
+
+  // Fallback para OpenAI
+  if (process.env.OPENAI_API_KEY) {
+    console.log("⚠️ Usando OpenAI fallback para comandos");
+    const { default: OpenAI } = await import("openai");
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    return {
+      name: "openai",
+      generate: async (prompt: string) => {
+        const completion = await openai.chat.completions.create({
+          messages: [{ role: "system", content: prompt }],
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          temperature: 0,
+        });
+        return completion.choices[0]?.message.content ?? "{}";
+      },
+    };
+  }
+
+  throw new Error(
+    "Nenhum provedor IA configurado para comandos. Configure AI_PROVIDER ou GROQ_API_KEY",
+  );
 }
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-
-const PRISMA_SCHEMA_CONTEXT = `
-enum TransactionType { INCOME EXPENSE }
-enum Role { USER TREASURER ADMIN }
-
-model User {
-  id String @id
-  name String?
-  email String @unique
-  phoneNumber String?
-  tenantId String?
-  role Role
-}
-
-model Member {
-  id String @id
-  name String
-  phone String?
-  tenantId String
-}
-
-model Category {
-  id String @id
-  name String
-  type TransactionType
-  tenantId String
-}
-
-model Account {
-  id String @id
-  name String
-  initialBalance Decimal
-  tenantId String
-}
-
-model transaction {
-  id String @id
-  description String?
-  amount Decimal
-  date DateTime
-  type TransactionType
-  categoryId String
-  accountId String
-  memberId String?
-  tenantId String
-}
-
-model StaffRole {
-  id String @id
-  name String
-  tenantId String
-}
-
-model Staff {
-  id String @id
-  name String
-  roleId String
-  phone String?
-  isSalaried Boolean
-  salary Decimal?
-  tenantId String
-}
-
-model AccountPayable {
-  id String @id
-  description String
-  amount Decimal
-  dueDate DateTime
-  isPaid Boolean
-  paidAt DateTime?
-  categoryId String
-  staffId String?
-  tenantId String
-}
-`;
 
 export interface TenantContext {
   categories: string;
@@ -100,14 +52,16 @@ export interface DatabaseAction {
 }
 
 export async function analyzeIntent(
-  text: string, 
+  text: string,
   tenantId: string,
-  context: TenantContext
+  context: TenantContext,
 ): Promise<DatabaseAction | null> {
-
   const hoje = new Date();
-  const dataFormatada = hoje.toLocaleDateString("pt-BR", { 
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  const dataFormatada = hoje.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
   const anoAtual = hoje.getFullYear();
 
@@ -123,7 +77,78 @@ export async function analyzeIntent(
     - Se o usuário falar "dia 20" (sem mês), assuma o mês atual. Se já passou, mês que vem. USE ANO ${anoAtual}.
 
     ### SCHEMA (TABELAS)
-    ${PRISMA_SCHEMA_CONTEXT}
+    enum TransactionType { INCOME EXPENSE }
+    enum Role { USER TREASURER ADMIN }
+
+    model User {
+      id String @id
+      name String?
+      email String @unique
+      phoneNumber String?
+      tenantId String?
+      role Role
+    }
+
+    model Member {
+      id String @id
+      name String
+      phone String?
+      tenantId String
+    }
+
+    model Category {
+      id String @id
+      name String
+      type TransactionType
+      tenantId String
+    }
+
+    model Account {
+      id String @id
+      name String
+      initialBalance Decimal
+      tenantId String
+    }
+
+    model transaction {
+      id String @id
+      description String?
+      amount Decimal
+      date DateTime
+      type TransactionType
+      categoryId String
+      accountId String
+      memberId String?
+      tenantId String
+    }
+
+    model StaffRole {
+      id String @id
+      name String
+      tenantId String
+    }
+
+    model Staff {
+      id String @id
+      name String
+      roleId String
+      phone String?
+      isSalaried Boolean
+      salary Decimal?
+      tenantId String
+    }
+
+    model AccountPayable {
+      id String @id
+      description String
+      amount Decimal
+      dueDate DateTime
+      isPaid Boolean
+      paidAt DateTime?
+      categoryId String
+      staffId String?
+      tenantId String
+    }
 
     ### DADOS DO CLIENTE (IDs REAIS)
     [CATEGORIAS]: ${context.categories}
@@ -142,8 +167,8 @@ export async function analyzeIntent(
     6. Lançamentos entrada e saída: "transaction" com type "INCOME" ou "EXPENSE", deixe sempre o campo memberId vazio, categoria deve ser sempre "Outras Entradas ou Outras Saídas", se o pedido especificar nomes coloque na descrição.
     7. Se não entender o comando responda "Desculpe, não entendi o comando"
     8. Cadastro de Staff só se o usuário pedir explicitamente e sempre cadastre com isSalaried: false".
-    9. Nunca aceite comendos para deletar, apagar ou excluir dados, se for o caso responda "Desculpe, não posso ajudar com isso".
-    🔥 10. DIFERENÇA VITAL (POUPE ERROS):
+    9. Nunca aceite comandos para deletar, apagar ou excluir dados, se for o caso responda "Desculpe, não posso ajudar com isso".
+    🔥 10. DIFERENÇA VITAL (PODE GERAR ERROS):
        - Se for "transaction" (Caixa/Pago agora): OBRIGATÓRIO incluir 'accountId' e 'categoryId'.
        - Se for "AccountPayable" (Conta a Pagar/Agendado): PROIBIDO incluir 'accountId' ou 'account'. Essa tabela NÃO tem vínculo com banco. Use apenas 'categoryId', 'amount', 'dueDate', 'description'.
     🔥 11. AÇÕES EM MASSA ("TODAS" / "TUDO"):
@@ -153,43 +178,29 @@ export async function analyzeIntent(
        - No 'where': { "isPaid": false, "dueDate": { "lte": "${new Date().toISOString()}" } } (Se for "atrasadas") OU apenas { "isPaid": false } (Se for "todas").
        - No 'data': { "isPaid": true, "paidAt": "${new Date().toISOString()}" }.
        - IMPORTANTE: O 'tenantId' deve estar no 'where', NUNCA no 'data' para updates.
-       ### PEDIDO: "${text}"
-
-    ### FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
-    {
-      "model": "AccountPayable", 
-      "action": "create",
-      "data": { ... },
-      "successReply": "Texto de sucesso",
-      "errorReply": "Texto de erro"
-    }
+    ### PEDIDO: "${text}"
   `;
 
   try {
-    const completion = await openai.chat.completions.create({
-      messages: [{ role: "system", content: prompt }],
-      model: "gpt-4o-mini", 
-      response_format: { type: "json_object" },
-      temperature: 0,
-    });
+    const aiProvider = await getAIProvider();
+    console.log(`🎯 Usando provider para comandos: ${aiProvider.name}`);
 
-    const content = completion.choices[0]?.message.content;
-    
+    const content = await aiProvider.generate(prompt);
+
     // LOG DE DEPURAÇÃO (Para vermos o que a IA mandou se der erro)
     console.log("🤖 RESPOSTA BRUTA DA IA:", content);
 
     if (!content) return null;
 
     const result = JSON.parse(content) as DatabaseAction;
-    
+
     // Validação extra simples
     if (!result.model || !result.action) {
-        console.error("❌ IA retornou JSON incompleto:", result);
-        return null;
+      console.error("❌ IA retornou JSON incompleto:", result);
+      return null;
     }
 
     return result;
-
   } catch (error) {
     console.error("Erro IA:", error);
     return null;

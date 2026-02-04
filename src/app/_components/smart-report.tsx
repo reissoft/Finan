@@ -138,13 +138,13 @@ export function SmartReport() {
     return (
       <div className="w-full">
         <ProFeatureBlock
-          feature="Relatórios com IA"
-          description="Gere relatórios inteligentes usando Inteligência Artificial. Faça perguntas em linguagem natural e obtenha insights financeiros instantâneos."
+          feature="Relatórios Financeiros com IA"
+          description="Crie relatórios financeiros personalizados usando Inteligência Artificial. Descreva os dados que precisa em linguagem natural e obtenha análises instantâneas."
           benefits={[
-            "Relatórios com IA personalizados",
-            "Perguntas em linguagem natural",
-            "Insights financeiros automáticos",
-            "Análise avançada de tendências",
+            "Relatórios financeiros com IA personalizados",
+            "Perguntas em linguagem natural sobre finanças",
+            "Análises instantâneas de entradas e saídas",
+            "Filtros inteligentes por categoria e período",
           ]}
           onClose={() => setShowProBlock(false)}
         />
@@ -159,18 +159,54 @@ export function SmartReport() {
         <div className="mb-2 flex items-center gap-2">
           <Crown className="h-5 w-5 text-amber-500" />
           <label className="text-sm font-medium text-gray-700">
-            ✨ Pergunte à Inteligência Artificial
+            ✨ Relatórios Financeiros com IA
           </label>
           <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
             PRO
           </span>
         </div>
+
+        {/* Helper examples */}
+        <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+          <p className="mb-2 text-xs font-medium text-blue-700">
+            💡 Exemplos de relatórios:
+          </p>
+          <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+            <div
+              onClick={() => setQuery("Gastos com energia e água neste mês")}
+              className="cursor-pointer rounded p-1 text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800"
+            >
+              ⚡ Gastos com energia e água neste mês
+            </div>
+            <div
+              onClick={() =>
+                setQuery("Receitas de ofertas nos últimos 3 meses")
+              }
+              className="cursor-pointer rounded p-1 text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800"
+            >
+              📈 Receitas de ofertas nos últimos 3 meses
+            </div>
+            <div
+              onClick={() => setQuery("Dízimos deste ano por membro")}
+              className="cursor-pointer rounded p-1 text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800"
+            >
+              🙏 Dízimos deste ano por membro
+            </div>
+            <div
+              onClick={() => setQuery("Todas as despesas do mês atual")}
+              className="cursor-pointer rounded p-1 text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800"
+            >
+              💸 Todas as despesas do mês atual
+            </div>
+          </div>
+        </div>
+
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Ex: Gastos com energia e internet neste mês..."
+              placeholder="Descreva o relatório financeiro que precisa..."
               className="w-full rounded-lg border border-gray-200 py-3 pr-4 pl-10 transition-all outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

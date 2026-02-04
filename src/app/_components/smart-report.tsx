@@ -41,7 +41,7 @@ export function SmartReport() {
   const [showProBlock, setShowProBlock] = useState(true);
 
   // Verificar plano do tenant
-  const { isPro, plan, isLoading } = useTenantPlan();
+  const { isPro, isLoading } = useTenantPlan();
 
   const handleSearch = () => {
     if (!query.trim()) return;

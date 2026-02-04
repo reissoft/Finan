@@ -18,7 +18,7 @@ export async function generateSmartReport(userQuery: string) {
   if (!user?.tenantId) throw new Error("Usuário sem organização");
 
   // Verificação de plano PRO no servidor
-  if (!user.tenant || user.tenant.plan !== "PRO") {
+  if (user?.tenant?.plan !== "PRO") {
     throw new Error(
       "Relatórios com IA são exclusivos do plano PRO. Faça upgrade para acessar esta funcionalidade.",
     );
@@ -98,7 +98,7 @@ export async function generateSmartReport(userQuery: string) {
     try {
       new Date(startIso).toISOString();
       new Date(endIso).toISOString();
-    } catch (e) {
+    } catch {
       // Se a data da IA estiver quebrada, usa o dia de hoje como fallback de emergência
       console.log("Data inválida detectada, usando fallback.");
       startIso = new Date().toISOString();

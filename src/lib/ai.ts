@@ -48,6 +48,7 @@ export interface DatabaseAction {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   where?: any;
   successReply: string;
+  errorReply: string;
 }
 
 export async function analyzeIntent(

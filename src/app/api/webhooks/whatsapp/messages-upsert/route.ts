@@ -3,7 +3,7 @@ import { analyzeIntent } from "~/lib/ai";
 import { sendWhatsAppMessage } from "~/lib/whatsapp";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type PrismaModel = any; 
+type PrismaModel = any;
 
 interface EvolutionWebhookBody {
   event: string;
@@ -31,15 +31,18 @@ interface EvolutionWebhookBody {
 const processedMessages = new Map<string, number>();
 
 // Limpa o cache a cada 10 minutos para não encher a memória RAM
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, timestamp] of processedMessages.entries()) {
-    if (now - timestamp > 5 * 60 * 1000) { // Remove mensagens mais velhas que 5 min
-      processedMessages.delete(id);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [id, timestamp] of processedMessages.entries()) {
+      if (now - timestamp > 5 * 60 * 1000) {
+        // Remove mensagens mais velhas que 5 min
+        processedMessages.delete(id);
+      }
     }
-  }
-}, 10 * 60 * 1000); 
-
+  },
+  10 * 60 * 1000,
+);
 
 export async function POST(req: Request) {
   try {
@@ -60,14 +63,14 @@ export async function POST(req: Request) {
     // --- 🛡️ 1.1 VERIFICAÇÃO DE DUPLICIDADE ---
     const messageId = messageData.key.id;
     if (messageId && processedMessages.has(messageId)) {
-        console.log(`🚫 Mensagem duplicada ignorada: ${messageId}`);
-        // Retornamos 200 para a Evolution parar de tentar enviar
-        return new Response("Duplicata ignorada", { status: 200 });
+      console.log(`🚫 Mensagem duplicada ignorada: ${messageId}`);
+      // Retornamos 200 para a Evolution parar de tentar enviar
+      return new Response("Duplicata ignorada", { status: 200 });
     }
 
     // Se não é duplicada, adiciona no cache
     if (messageId) {
-        processedMessages.set(messageId, Date.now());
+      processedMessages.set(messageId, Date.now());
     }
 
     // --- 2. RECUPERAÇÃO DO TELEFONE ---
@@ -87,10 +90,10 @@ export async function POST(req: Request) {
       const prefixo = phone.slice(0, 4);
       const sufixo = phone.slice(4);
       const primeiroDigito = parseInt(sufixo[0]!); // O ! garante que existe
-      
+
       if (primeiroDigito >= 6) {
-          phone = `${prefixo}9${sufixo}`;
-          console.log("✅ 9º dígito adicionado automaticamente.");
+        phone = `${prefixo}9${sufixo}`;
+        console.log("✅ 9º dígito adicionado automaticamente.");
       }
     }
 
@@ -142,10 +145,10 @@ export async function POST(req: Request) {
     };
 
     // Bloqueia se não for PRO
-    if(user.tenant?.plan !== "PRO") {
+    if (user.tenant?.plan !== "PRO") {
       await sendWhatsAppMessage(
         rawPhone ?? phone,
-        "Você precisa estar no plano PRO para usar este recurso."
+        "Você precisa estar no plano PRO para usar este recurso.",
       );
       return new Response("Plano não permite uso", { status: 200 });
     }
@@ -156,21 +159,25 @@ export async function POST(req: Request) {
     // Se a IA falhar
     if (!actionPlan) {
       await sendWhatsAppMessage(
-        rawPhone ?? phone, 
-        "🤔 Não consegui entender esse comando. Tente reformular."
+        rawPhone ?? phone,
+        "🤔 Não consegui entender esse comando. Tente reformular.",
       );
       return new Response("IA não retornou plano", { status: 200 });
     }
 
     // --- 7. EXECUTOR DE BANCO DE DADOS ---
-    console.log(`🛠 Executando no Prisma: ${actionPlan.model}.${actionPlan.action}`);
+    console.log(
+      `🛠 Executando no Prisma: ${actionPlan.model}.${actionPlan.action}`,
+    );
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const model = (db as any)[actionPlan.model] as PrismaModel;
 
       if (!model) {
-        throw new Error(`Tabela '${actionPlan.model}' não encontrada no Prisma.`);
+        throw new Error(
+          `Tabela '${actionPlan.model}' não encontrada no Prisma.`,
+        );
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -180,7 +187,7 @@ export async function POST(req: Request) {
         case "create":
           // DADOS PUROS VINDOS DA IA
           const rawData = actionPlan.data;
-          
+
           // O objeto que será enviado ao Prisma
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const prismaPayload: any = {};
@@ -188,26 +195,25 @@ export async function POST(req: Request) {
           // --- 🔄 TRANSFORMADOR GENÉRICO (A MÁGICA) ---
           // Varre cada campo que a IA mandou e decide como formatar para o Prisma
           for (const [key, value] of Object.entries(rawData)) {
-            
             // 1. Ignora campos nulos/undefined (limpeza)
             if (value === null || value === undefined) continue;
 
             // 2. Se for o Tenant (Sempre obrigatório)
             if (key === "tenantId") {
-                prismaPayload.tenant = { connect: { id: user.tenantId } };
-                continue;
+              prismaPayload.tenant = { connect: { id: user.tenantId } };
+              continue;
             }
 
             // 3. Se for qualquer outro campo de relacionamento (termina em 'Id')
             // Ex: categoryId -> category: { connect: { id: ... } }
             // Ex: accountId  -> account:  { connect: { id: ... } }
             if (key.endsWith("Id") && key !== "id") {
-                const relationName = key.replace("Id", ""); // Remove o sufixo "Id"
-                prismaPayload[relationName] = { connect: { id: value } };
-            } 
+              const relationName = key.replace("Id", ""); // Remove o sufixo "Id"
+              prismaPayload[relationName] = { connect: { id: value } };
+            }
             // 4. Se for dado comum (description, amount, date...)
             else {
-                prismaPayload[key] = value;
+              prismaPayload[key] = value;
             }
           }
 
@@ -218,7 +224,7 @@ export async function POST(req: Request) {
           });
           break;
 
-        case "updateMany": 
+        case "updateMany":
         case "update":
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.updateMany({
@@ -234,13 +240,13 @@ export async function POST(req: Request) {
           });
           break;
 
-          case "findMany":
+        case "findMany":
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           dbResult = await model.findMany({
             where: actionPlan.where,
           });
           break;
-          
+
         default:
           throw new Error(`Ação não suportada.`);
       }
@@ -248,38 +254,44 @@ export async function POST(req: Request) {
       console.log("✅ DB Sucesso:", dbResult);
 
       // --- 8. FEEDBACK POSITIVO ---
-      console.log("✅ DB Sucesso, linhas afetadas/retornadas:", Array.isArray(dbResult) ? dbResult.length : 1);
+      console.log(
+        "✅ DB Sucesso, linhas afetadas/retornadas:",
+        Array.isArray(dbResult) ? dbResult.length : 1,
+      );
 
       // --- 8. PREPARAÇÃO DA RESPOSTA (NOVO) ---
       let finalMessage = actionPlan.successReply;
 
       // Se foi uma busca (findMany/findFirst), anexa os dados formatados
       if (actionPlan.action.startsWith("find")) {
-         const formattedData = formatDatabaseResult(actionPlan.model, dbResult);
-         finalMessage += `\n${formattedData}`;
+        const formattedData = formatDatabaseResult(actionPlan.model, dbResult);
+        finalMessage += `\n${formattedData}`;
       }
 
       // Se foi um updateMany (ex: "Pagar todas"), mostra quantos foram afetados
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (actionPlan.action === "updateMany" && dbResult?.count) {
-         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-         finalMessage += `\n\n(Total processado: ${dbResult.count} itens)`;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        finalMessage += `\n\n(Total processado: ${dbResult.count} itens)`;
       }
 
       // --- 9. ENVIO DO WHATSAPP ---
-      await sendWhatsAppMessage(rawPhone ?? phone, finalMessage);
+      console.log(`📱 Enviando WhatsApp para ${rawPhone ?? phone}:`);
+      console.log(`💬 Mensagem: ${finalMessage}`);
+      console.log(`📏 Tamanho da mensagem: ${finalMessage?.length} caracteres`);
 
+      await sendWhatsAppMessage(rawPhone ?? phone, finalMessage);
     } catch (dbError) {
       console.error("❌ Erro na Execução do Banco:", dbError);
-      
+
       // --- 9. FEEDBACK NEGATIVO ---
       await sendWhatsAppMessage(rawPhone ?? phone, actionPlan.errorReply);
     }
 
     return new Response("Sucesso", { status: 200 });
-
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido";
     console.error("❌ Erro Crítico no Webhook:", errorMessage);
     return new Response("Erro interno", { status: 500 });
   }
@@ -290,7 +302,7 @@ export async function POST(req: Request) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatDatabaseResult(model: string, data: any): string {
   if (!data) return "";
-  
+
   // Se for uma lista (Array), formata item por item
   if (Array.isArray(data)) {
     if (data.length === 0) return "\n_(Nenhum registro encontrado)_";
@@ -304,9 +316,15 @@ function formatDatabaseResult(model: string, data: any): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatSingleItem(model: string, item: any): string {
-  const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  const currency = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-  const date = item.date ?? item.dueDate ? new Date(item.date ?? item.dueDate).toLocaleDateString('pt-BR') : "";
+  const date =
+    (item.date ?? item.dueDate)
+      ? new Date(item.date ?? item.dueDate).toLocaleDateString("pt-BR")
+      : "";
 
   switch (model) {
     case "AccountPayable":

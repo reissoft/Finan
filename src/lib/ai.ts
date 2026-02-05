@@ -190,14 +190,28 @@ export async function analyzeIntent(
     // LOG DE DEPURAÇÃO (Para vermos o que a IA mandou se der erro)
     console.log("🤖 RESPOSTA BRUTA DA IA:", content);
 
-    if (!content) return null;
+    if (!content) {
+      console.error("❌ IA retornou conteúdo vazio");
+      return null;
+    }
 
     const result = JSON.parse(content) as DatabaseAction;
 
     // Validação extra simples
     if (!result.model || !result.action) {
       console.error("❌ IA retornou JSON incompleto:", result);
+      console.error("❌ Model:", result.model);
+      console.error("❌ Action:", result.action);
+      console.error("❌ Data:", result.data);
       return null;
+    }
+
+    // Verificar se successReply existe
+    if (!result.successReply) {
+      console.error("❌ successReply não encontrado no resultado da IA");
+      console.error("❌ Result completo:", result);
+    } else {
+      console.log("✅ successReply encontrado:", result.successReply);
     }
 
     return result;

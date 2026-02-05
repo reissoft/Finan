@@ -9,7 +9,7 @@ export async function generateWithGroq(prompt: string): Promise<string> {
     console.log("🤖 Gerando relatório com Groq...");
 
     const response = await groq.chat.completions.create({
-      model: "llama3-8b-8192", // Modelo estável disponível
+      model: "llama3-8b-instant", // Modelo otimizado para performance
       messages: [{ role: "system", content: prompt }],
       response_format: { type: "json_object" },
       max_tokens: 1000,

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { AccountsSummary } from "../_components/accounts-summary";
 
 export default function ReportsPage() {
   // Datas padrão: Início e Fim do mês atual
@@ -143,13 +144,22 @@ export default function ReportsPage() {
                 </div>
 
             </div>
+            
+            
+            
 
             <div className="mt-8 text-center text-xs text-gray-400 print:mt-16">
                 <p>Gerado automaticamente pelo Sistema Finan Igreja em {new Date().toLocaleString()}</p>
             </div>
 
         </div>
+        <br>
+            </br>
+        {/* ✅ AQUI ESTÁ O NOVO COMPONENTE DE CONTAS ✅ */}
+                            <AccountsSummary />
+                            {/* =========================================== */}
       </div>
+      
     </main>
   );
 }

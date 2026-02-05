@@ -7,6 +7,7 @@ import { reportsRouter } from "./routers/reports";
 import { staffRouter } from "./routers/staff";
 import { payablesRouter } from "./routers/payables";
 import { stripeRouter } from "./routers/stripe";
+import { accountRouter } from "./routers/account";
 
 /**
  * This is the primary router for your server.
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   staff: staffRouter,
   payables: payablesRouter,
   stripe: stripeRouter,
+  account: accountRouter, // Adicionado accountRouter aqui
 });
 
 // export type definition of API

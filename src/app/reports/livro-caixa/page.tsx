@@ -166,6 +166,7 @@ export default function LivroCaixaPage() {
                 </div>
             </div>
         </div>
+        
 
         {/* ASSINATURAS */}
         <div className="mt-16 grid grid-cols-2 gap-12 text-center break-inside-avoid">

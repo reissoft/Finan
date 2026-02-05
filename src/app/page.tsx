@@ -7,15 +7,30 @@ import { AuthForm } from "./_components/auth-form";
 import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 import { SignOutButton } from "./_components/sign-out-button";
-import { AccountsSummary } from "./_components/accounts-summary";
+import { AccountsSummary } from "./_components/accounts-summary"; // Já estava importado ✅
 import { DashboardCharts } from "./_components/dashboard-charts";
 import { SmartReport } from "./_components/smart-report";
-import { AccountsSummary } from "./_components/accounts-summary";
-import { 
-  type Props = {
-    searchParams: Promise<Record<string, string | string[] | undefined>>;
-  };
-}
+
+type Props = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function Home({ searchParams }: Props) {
+  const session = await auth();
+
+  if (!session?.user) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
+        <div className="mb-8 text-center">
+          <h1 className="mb-2 text-5xl font-bold text-white">
+            Finan Igreja ⛪
+          </h1>
+          <p className="text-gray-400">Sistema de Tesouraria Inteligente</p>
+        </div>
+        <AuthForm />
+      </main>
+    );
+  }
 
   const userFull = await db.user.findUnique({
     where: { id: session.user.id },
@@ -38,7 +53,6 @@ import {
   const rawStats = await api.transaction.getDashboardStats({ month, year });
 
   // --- 2. BUSCA DADOS ACUMULADOS (Direto no Banco) ---
-  // Calculamos o saldo total da história da igreja para mostrar no card acumulativo
   let accumulatedBalance = 0;
 
   if (tenantId) {
@@ -148,10 +162,9 @@ import {
 
         <MonthSelector />
 
-        {/* CARDS DE RESUMO */}
-        {/* Alterado para grid-cols-4 para caber o novo card */}
+        {/* CARDS DE RESUMO (Entrada, Saída, Saldo Mês, Saldo Total) */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Entradas do Mês */}
+          {/* Card 1: Entradas */}
           <div className="rounded-lg border-l-4 border-green-500 bg-white p-6 shadow">
             <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
               Entradas ({month}/{year})
@@ -161,7 +174,7 @@ import {
             </p>
           </div>
 
-          {/* Card 2: Saídas do Mês */}
+          {/* Card 2: Saídas */}
           <div className="rounded-lg border-l-4 border-red-500 bg-white p-6 shadow">
             <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
               Saídas ({month}/{year})
@@ -176,15 +189,13 @@ import {
             <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
               Resultado ({month}/{year})
             </p>
-            <p
-              className={`mt-1 text-2xl font-bold ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
-            >
+            <p className={`mt-1 text-2xl font-bold ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
               R$ {stats.balance.toFixed(2)}
             </p>
           </div>
 
-          {/* Card 4: NOVO - Saldo Acumulado (Total Geral) */}
-          <div className="rounded-lg border-l-4 border-indigo-600 bg-indigo-50 bg-white p-6 shadow">
+          {/* Card 4: Saldo Acumulado */}
+          <div className="rounded-lg border-l-4 border-indigo-600 bg-white p-6 shadow">
             <div className="flex items-start justify-between">
               <p className="text-xs font-bold tracking-wider text-indigo-800 uppercase">
                 Saldo em Caixa (Total)
@@ -193,14 +204,15 @@ import {
                 Acumulado
               </span>
             </div>
-            <p
-              className={`mt-1 text-2xl font-bold ${accumulatedBalance >= 0 ? "text-indigo-700" : "text-red-600"}`}
-            >
+            <p className={`mt-1 text-2xl font-bold ${accumulatedBalance >= 0 ? "text-indigo-700" : "text-red-600"}`}>
               R$ {accumulatedBalance.toFixed(2)}
             </p>
           </div>
         </div>
-        {/* --- NOVO: RELATÓRIO INTELIGENTE --- */}
+
+        
+
+        {/* RELATÓRIO INTELIGENTE */}
         <SmartReport />
 
         {/* GRÁFICOS */}

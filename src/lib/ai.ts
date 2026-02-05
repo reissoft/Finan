@@ -178,6 +178,16 @@ export async function analyzeIntent(
        - No 'data': { "isPaid": true, "paidAt": "${new Date().toISOString()}" }.
        - IMPORTANTE: O 'tenantId' deve estar no 'where', NUNCA no 'data' para updates.
     ### PEDIDO: "${text}"
+
+    ### FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
+    {
+      "model": "AccountPayable", 
+      "action": "create",
+      "data": { ... },
+      "successReply": "Texto de sucesso",
+      "errorReply": "Texto de erro"
+    }
+    
   `;
 
   try {

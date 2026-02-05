@@ -7,31 +7,19 @@ import { AuthForm } from "./_components/auth-form";
 import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 import { SignOutButton } from "./_components/sign-out-button";
-import { DashboardCharts } from "./_components/dashboard-charts"; 
+import { AccountsSummary } from "./_components/accounts-summary";
+import { DashboardCharts } from "./_components/dashboard-charts";
 import { SmartReport } from "./_components/smart-report";
-
-type Props = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function Home({ searchParams }: Props) {
-  const session = await auth();
-
-  if (!session?.user) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
-        <div className="mb-8 text-center">
-          <h1 className="text-5xl font-bold text-white mb-2">Finan Igreja ⛪</h1>
-          <p className="text-gray-400">Sistema de Tesouraria Inteligente</p>
-        </div>
-        <AuthForm />
-      </main>
-    );
-  }
+import { AccountsSummary } from "./_components/accounts-summary";
+import { 
+  type Props = {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  };
+}
 
   const userFull = await db.user.findUnique({
     where: { id: session.user.id },
-    include: { tenant: true }
+    include: { tenant: true },
   });
   const currentPlan = userFull?.tenant?.plan ?? "FREE";
   const tenantId = userFull?.tenantId;
@@ -52,7 +40,7 @@ export default async function Home({ searchParams }: Props) {
   // --- 2. BUSCA DADOS ACUMULADOS (Direto no Banco) ---
   // Calculamos o saldo total da história da igreja para mostrar no card acumulativo
   let accumulatedBalance = 0;
-  
+
   if (tenantId) {
     const allTimeStats = await db.transaction.groupBy({
       by: ["type"],
@@ -60,8 +48,12 @@ export default async function Home({ searchParams }: Props) {
       _sum: { amount: true },
     });
 
-    const totalIncome = Number(allTimeStats.find((i) => i.type === "INCOME")?._sum.amount ?? 0);
-    const totalExpense = Number(allTimeStats.find((i) => i.type === "EXPENSE")?._sum.amount ?? 0);
+    const totalIncome = Number(
+      allTimeStats.find((i) => i.type === "INCOME")?._sum.amount ?? 0,
+    );
+    const totalExpense = Number(
+      allTimeStats.find((i) => i.type === "EXPENSE")?._sum.amount ?? 0,
+    );
     accumulatedBalance = totalIncome - totalExpense;
   }
 
@@ -71,9 +63,9 @@ export default async function Home({ searchParams }: Props) {
     description: t.description,
     type: t.type,
     date: t.date,
-    amount: Number(t.amount),            
-    category: { name: t.category.name }, 
-    account: { name: t.account.name },   
+    amount: Number(t.amount),
+    category: { name: t.category.name },
+    account: { name: t.account.name },
     member: t.member ? { name: t.member.name } : null,
   }));
 
@@ -84,98 +76,129 @@ export default async function Home({ searchParams }: Props) {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-8 bg-gray-100">
-      <div className="w-full max-w-6xl flex justify-between items-center mb-8">
+    <main className="flex min-h-screen flex-col items-center bg-gray-100 p-8">
+      <div className="mb-8 flex w-full max-w-6xl items-center justify-between">
         <h1 className="text-4xl font-bold text-blue-900">Financeiro</h1>
 
         <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:flex flex-col items-end">
-            <p className="text-sm font-bold text-gray-700 leading-tight">
-                {session.user?.name}
+          <div className="hidden flex-col items-end text-right sm:flex">
+            <p className="text-sm leading-tight font-bold text-gray-700">
+              {session.user?.name}
             </p>
-            
+
             <div className="mt-1">
-                {currentPlan === "FREE" ? (
-                    <div className="flex items-center gap-2">
-                        <span className="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-gray-300">
-                            Free
-                        </span>
-                        <Link 
-                            href="/settings"
-                            className="text-[10px] text-blue-600 font-bold hover:underline hover:text-blue-800 transition-colors flex items-center gap-0.5"
-                        >
-                            Fazer Upgrade 🚀
-                        </Link>
-                    </div>
-                ) : (
-                    <span className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shadow-sm border border-yellow-500">
-                        ⭐ PRO
-                    </span>
-                )}
+              {currentPlan === "FREE" ? (
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-gray-300 bg-gray-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-gray-600 uppercase">
+                    Free
+                  </span>
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-0.5 text-[10px] font-bold text-blue-600 transition-colors hover:text-blue-800 hover:underline"
+                  >
+                    Fazer Upgrade 🚀
+                  </Link>
+                </div>
+              ) : (
+                <span className="rounded-full border border-yellow-500 bg-gradient-to-r from-yellow-400 to-yellow-600 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow-sm">
+                  ⭐ PRO
+                </span>
+              )}
             </div>
           </div>
 
           <SignOutButton />
         </div>
       </div>
-      
+
       <div className="w-full max-w-6xl space-y-6">
         {/* BOTÕES DE NAVEGAÇÃO */}
         <div className="flex flex-wrap gap-3">
-            <Link href="/members" className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold hover:bg-blue-200 transition text-sm flex items-center gap-2">
-                👥 Membros
-            </Link>
-            <Link href="/settings" className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition text-sm flex items-center gap-2">
-                ⚙️ Configurações
-            </Link>
-            <Link href="/reports" className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full font-bold hover:bg-purple-200 transition text-sm flex items-center gap-2">
-                📊 Relatórios
-            </Link>
-            <Link href="/staff" className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-bold hover:bg-orange-200 transition text-sm flex items-center gap-2">
-                👔 Equipe
-            </Link>
-            <Link href="/payables" className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition text-sm flex items-center gap-2">
-                💸 Contas a Pagar
-            </Link>
+          <Link
+            href="/members"
+            className="flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 transition hover:bg-blue-200"
+          >
+            👥 Membros
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-2 rounded-full bg-gray-200 px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-300"
+          >
+            ⚙️ Configurações
+          </Link>
+          <Link
+            href="/reports"
+            className="flex items-center gap-2 rounded-full bg-purple-100 px-4 py-2 text-sm font-bold text-purple-800 transition hover:bg-purple-200"
+          >
+            📊 Relatórios
+          </Link>
+          <Link
+            href="/staff"
+            className="flex items-center gap-2 rounded-full bg-orange-100 px-4 py-2 text-sm font-bold text-orange-800 transition hover:bg-orange-200"
+          >
+            👔 Equipe
+          </Link>
+          <Link
+            href="/payables"
+            className="flex items-center gap-2 rounded-full bg-red-100 px-4 py-2 text-sm font-bold text-red-800 transition hover:bg-red-200"
+          >
+            💸 Contas a Pagar
+          </Link>
         </div>
 
         <MonthSelector />
-        
+
         {/* CARDS DE RESUMO */}
         {/* Alterado para grid-cols-4 para caber o novo card */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Card 1: Entradas do Mês */}
-          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Entradas ({month}/{year})</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">R$ {stats.income.toFixed(2)}</p>
+          <div className="rounded-lg border-l-4 border-green-500 bg-white p-6 shadow">
+            <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
+              Entradas ({month}/{year})
+            </p>
+            <p className="mt-1 text-2xl font-bold text-green-600">
+              R$ {stats.income.toFixed(2)}
+            </p>
           </div>
 
           {/* Card 2: Saídas do Mês */}
-          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
-            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Saídas ({month}/{year})</p>
-            <p className="text-2xl font-bold text-red-600 mt-1">R$ {stats.expense.toFixed(2)}</p>
+          <div className="rounded-lg border-l-4 border-red-500 bg-white p-6 shadow">
+            <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
+              Saídas ({month}/{year})
+            </p>
+            <p className="mt-1 text-2xl font-bold text-red-600">
+              R$ {stats.expense.toFixed(2)}
+            </p>
           </div>
 
           {/* Card 3: Saldo do Mês */}
-          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
-            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Resultado ({month}/{year})</p>
-            <p className={`text-2xl font-bold mt-1 ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
+          <div className="rounded-lg border-l-4 border-blue-500 bg-white p-6 shadow">
+            <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
+              Resultado ({month}/{year})
+            </p>
+            <p
+              className={`mt-1 text-2xl font-bold ${stats.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
+            >
               R$ {stats.balance.toFixed(2)}
             </p>
           </div>
 
           {/* Card 4: NOVO - Saldo Acumulado (Total Geral) */}
-          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-indigo-600 bg-indigo-50">
-            <div className="flex justify-between items-start">
-                <p className="text-indigo-800 text-xs uppercase font-bold tracking-wider">Saldo em Caixa (Total)</p>
-                <span className="text-[10px] bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">Acumulado</span>
+          <div className="rounded-lg border-l-4 border-indigo-600 bg-indigo-50 bg-white p-6 shadow">
+            <div className="flex items-start justify-between">
+              <p className="text-xs font-bold tracking-wider text-indigo-800 uppercase">
+                Saldo em Caixa (Total)
+              </p>
+              <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-[10px] text-indigo-800">
+                Acumulado
+              </span>
             </div>
-            <p className={`text-2xl font-bold mt-1 ${accumulatedBalance >= 0 ? "text-indigo-700" : "text-red-600"}`}>
+            <p
+              className={`mt-1 text-2xl font-bold ${accumulatedBalance >= 0 ? "text-indigo-700" : "text-red-600"}`}
+            >
               R$ {accumulatedBalance.toFixed(2)}
             </p>
           </div>
-
         </div>
         {/* --- NOVO: RELATÓRIO INTELIGENTE --- */}
         <SmartReport />
@@ -186,16 +209,18 @@ export default async function Home({ searchParams }: Props) {
         <CreateTransaction />
 
         {/* LISTA DE TRANSAÇÕES */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2 flex justify-between items-center">
-            <span>Lançamentos de {month}/{year}</span>
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
-                {transactions.length} itens
+        <div className="rounded-lg bg-white p-6 shadow-md">
+          <h2 className="mb-4 flex items-center justify-between border-b pb-2 text-2xl font-semibold">
+            <span>
+              Lançamentos de {month}/{year}
+            </span>
+            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500">
+              {transactions.length} itens
             </span>
           </h2>
           <div className="space-y-4">
             {transactions.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
+              <p className="py-8 text-center text-gray-500">
                 Nenhum lançamento em {month}/{year}.
               </p>
             ) : (

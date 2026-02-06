@@ -34,9 +34,9 @@ export function CreateTransaction() {
 
   const createMutation = api.transaction.create.useMutation({
     onSuccess: () => {
-      utils.transaction.invalidate();
-      utils.account.invalidate(); 
-      utils.budget.invalidate(); 
+      void utils.transaction.invalidate();
+      void utils.account.invalidate(); 
+      void utils.budget.invalidate(); 
       router.refresh();
       setDescription("");
       setAmount("");

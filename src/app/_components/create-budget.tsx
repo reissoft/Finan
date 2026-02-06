@@ -25,7 +25,7 @@ export function CreateBudget() {
 
   const createBudget = api.budget.create.useMutation({
     onSuccess: () => {
-      ctx.budget.getBudgetProgress.invalidate(); // Atualiza a lista
+      void ctx.budget.getBudgetProgress.invalidate();
       setOpen(false); // Fecha o modal
       setAmount(""); // Limpa campo
     },
@@ -35,7 +35,7 @@ export function CreateBudget() {
     e.preventDefault();
     if (!categoryId || !amount) return;
 
-    createBudget.mutate({
+    void createBudget.mutate({
       categoryId,
       amount: Number(amount),
       startDate: new Date(startDate), // Converte string para Date

@@ -29,8 +29,12 @@ export const budgetRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user?.tenantId) throw new Error("Sem organização");
+
+      const { tenantId } = user;
+      if (!tenantId) return [];
+
       const budgets = await ctx.db.budget.findMany({
-        where: { tenantId: user.tenantId },
+        where: { tenantId: tenantId },
         include: { category: true }, // Inclui a categoria para sabermos o TYPE
         orderBy: { startDate: 'desc' }
       });
@@ -39,7 +43,7 @@ export const budgetRouter = createTRPCRouter({
         const transactions = await ctx.db.transaction.aggregate({
           _sum: { amount: true },
           where: {
-            tenantId: user.tenantId,
+            tenantId: tenantId,
             categoryId: budget.categoryId,
             date: {
               gte: budget.startDate,

@@ -54,7 +54,7 @@ export function BudgetOverview() {
         <CardContent className="space-y-6 pt-4">
           {(!budgets || budgets.length === 0) ? (
               <div className="text-center py-6 text-gray-500 text-sm bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                  Nenhuma meta definida. Clique em "Nova Meta" para começar.
+                  Nenhuma meta definida. Clique em Nova Meta para começar.
               </div>
           ) : (
               budgets.map((item) => (

@@ -7,9 +7,9 @@ import { AuthForm } from "./_components/auth-form";
 import { MonthSelector } from "./_components/month-selector";
 import Link from "next/link";
 import { SignOutButton } from "./_components/sign-out-button";
-import { AccountsSummary } from "./_components/accounts-summary"; // Já estava importado ✅
 import { DashboardCharts } from "./_components/dashboard-charts";
 import { SmartReport } from "./_components/smart-report";
+
 
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -141,6 +141,12 @@ export default async function Home({ searchParams }: Props) {
             ⚙️ Configurações
           </Link>
           <Link
+            href="/budgets"
+            className="flex items-center gap-2 rounded-full bg-teal-100 px-4 py-2 text-sm font-bold text-teal-800 transition hover:bg-teal-200"
+          >
+            🎯 Metas & Orçamento
+          </Link>
+          <Link
             href="/reports"
             className="flex items-center gap-2 rounded-full bg-purple-100 px-4 py-2 text-sm font-bold text-purple-800 transition hover:bg-purple-200"
           >
@@ -210,8 +216,7 @@ export default async function Home({ searchParams }: Props) {
           </div>
         </div>
 
-        
-
+       
         {/* RELATÓRIO INTELIGENTE */}
         <SmartReport />
 

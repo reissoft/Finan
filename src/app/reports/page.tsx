@@ -32,7 +32,9 @@ export default function ReportsPage() {
         <div className="flex justify-between items-center mb-8 print:hidden">
             <h1 className="text-3xl font-bold text-blue-900">Relatórios 📊</h1>
             <div className="flex gap-4">
-                {/* BOTÃO NOVO AQUI 👇 */}
+                <Link href="/reports/orcamento" className="bg-purple-700 text-white px-4 py-2 rounded font-bold hover:bg-purple-800 transition text-sm flex items-center gap-2">
+                    🎯 Orçamentos
+                </Link>
                 <Link href="/reports/balancete" className="bg-blue-800 text-white px-4 py-2 rounded font-bold hover:bg-blue-900 transition text-sm flex items-center gap-2">
                     📄 Balancete
                 </Link>

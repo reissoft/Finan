@@ -6,6 +6,7 @@ import { api } from "~/trpc/react";
 
 export function CreateTransaction() {
   const router = useRouter();
+  const utils = api.useUtils();
   
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -14,15 +15,28 @@ export function CreateTransaction() {
   const [accountId, setAccountId] = useState("");
   const [memberId, setMemberId] = useState("");
   
-  // 1. NOVO: Estado para a data (inicia com a data de hoje formatada YYYY-MM-DD)
+  // 1. Estado para a data (inicia com a data de hoje formatada YYYY-MM-DD)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const { data: categories } = api.transaction.getCategories.useQuery();
+  const { data: categories } = api.category.getAll.useQuery();
   const { data: accounts } = api.transaction.getAccounts.useQuery();
   const { data: members } = api.member.getAll.useQuery();
 
+  // 2. Filtra as categorias baseado no tipo selecionado
+  const filteredCategories = categories?.filter((cat) => cat.type === type);
+
+  // 3. Função para trocar o tipo e limpar a categoria (CORRIGIDO: Agora vamos usar ela)
+  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newType = e.target.value as "INCOME" | "EXPENSE";
+    setType(newType);
+    setCategoryId(""); // Reseta a categoria para evitar erro
+  };
+
   const createMutation = api.transaction.create.useMutation({
     onSuccess: () => {
+      utils.transaction.invalidate();
+      utils.account.invalidate(); 
+      utils.budget.invalidate(); 
       router.refresh();
       setDescription("");
       setAmount("");
@@ -40,8 +54,7 @@ export function CreateTransaction() {
       description,
       amount: parseFloat(amount),
       type,
-      // 2. NOVO: Envia a data escolhida pelo usuário
-      // Adicionamos T12:00 para garantir que não volte um dia por causa do fuso horário
+      // Envia a data escolhida pelo usuário com hora fixa para evitar fuso
       date: new Date(date + "T12:00:00"), 
       categoryId,
       accountId,
@@ -52,9 +65,10 @@ export function CreateTransaction() {
   return (
     <form onSubmit={onSubmit} className="mb-8 p-4 bg-white rounded shadow flex flex-col gap-4">
       <div className="flex gap-4">
+        {/* SELECT DE TIPO - AGORA USA A FUNÇÃO CORRETA */}
         <select 
             value={type} 
-            onChange={(e) => setType(e.target.value as "INCOME" | "EXPENSE")}
+            onChange={handleTypeChange}
             className={`border p-2 rounded font-bold ${type === "INCOME" ? "text-green-600" : "text-red-600"}`}
         >
             <option value="INCOME">Entrada (+)</option>
@@ -80,7 +94,7 @@ export function CreateTransaction() {
             required
         />
         
-        {/* 3. NOVO: Input de Data */}
+        {/* Input de Data */}
         <input 
             type="date"
             className="border p-2 rounded text-black"
@@ -91,14 +105,20 @@ export function CreateTransaction() {
       </div>
 
       <div className="flex gap-4">
+        {/* SELECT DE CATEGORIA - AGORA USA A LISTA FILTRADA */}
         <select 
             className="border p-2 rounded flex-1 text-black"
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
             required
         >
-            <option value="">Categoria...</option>
-            {categories?.map((cat) => (
+            <option value="">
+                {filteredCategories?.length === 0 
+                 ? `Sem categorias de ${type === "INCOME" ? "Entrada" : "Saída"}` 
+                 : "Categoria..."}
+            </option>
+            {/* AQUI ESTAVA O ERRO: Trocamos categories por filteredCategories */}
+            {filteredCategories?.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
         </select>
@@ -114,7 +134,8 @@ export function CreateTransaction() {
                 <option key={acc.id} value={acc.id}>{acc.name}</option>
             ))}
         </select>
-{type === "INCOME" && (
+
+        {type === "INCOME" && (
             <select
                 className="border p-2 rounded flex-1 text-black"
                 value={memberId}

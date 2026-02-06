@@ -45,6 +45,7 @@ model Tenant {
     staff        Staff[]      // Relacionamento com Staff (que criamos antes)
     staffRoles   StaffRole[]  // Relacionamento com Cargos (que criamos antes)
     accountPayables AccountPayable[]
+    budgets   Budget[]
 
     @@map("tenants")
 }
@@ -125,9 +126,11 @@ model Category {
 
     transactions transaction[]
     accountPayables AccountPayable[]
+    budgets   Budget[]
 
     @@index([tenantId])
     @@map("categories")
+    
 }
 
 // Contas Bancárias / Caixas
@@ -291,4 +294,25 @@ model AccountPayable {
 
     @@index([tenantId])
     @@index([dueDate])
+}
+
+// Adicione isso no final do arquivo
+model Budget {
+  id          String   @id @default(cuid())
+  description String?  // Ex: "Orçamento 2026 - Energia"
+  amount      Decimal  // Valor da Meta/Teto (Ex: 5.000,00)
+  startDate   DateTime // Início do período (Ex: 01/01/2026)
+  endDate     DateTime // Fim do período (Ex: 31/12/2026)
+  
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([categoryId])
 }
